@@ -1,0 +1,486 @@
+{
+ "started": "2026-10-17T21:26:45",
+ "versions": {
+  "ollama": "d1ed3fd13ac73f60cff00bbead8af24a68c4200d 2026-10-16",
+  "llama.cpp": "f74e2fa6a31cc33ab4ee4ae516641cfe62df3924 2026-10-16",
+  "tokenizers": "0.23.3"
+ },
+ "seed": 0,
+ "generated": 5000,
+ "tokenizers": {
+  "deepseek-r1-qwen": {
+   "cases": 7262,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 278,
+     "error": 0
+    }
+   }
+  },
+  "deepseek-v3": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 1655,
+     "error": 0
+    }
+   }
+  },
+  "exaone4": {
+   "cases": 7585,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 52,
+     "error": 0
+    }
+   }
+  },
+  "gemma4-dfm": {
+   "cases": 7290,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "glm4": {
+   "cases": 7150,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 56,
+     "error": 0
+    }
+   }
+  },
+  "glm4.5": {
+   "cases": 7458,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 56,
+     "error": 0
+    }
+   }
+  },
+  "glm4.7": {
+   "cases": 7458,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 56,
+     "error": 0
+    }
+   }
+  },
+  "gpt-4o": {
+   "cases": 6982,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 56,
+     "error": 0
+    }
+   }
+  },
+  "gpt-oss": {
+   "cases": 7248,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 54,
+     "error": 0
+    }
+   }
+  },
+  "granite-docling": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 51,
+     "error": 0
+    }
+   }
+  },
+  "grok-2": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 56,
+     "error": 0
+    }
+   }
+  },
+  "hunyuan": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 224,
+     "error": 0
+    }
+   }
+  },
+  "kanana2": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 222,
+     "error": 0
+    }
+   }
+  },
+  "laguna": {
+   "cases": 7791,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 1699,
+     "error": 0
+    }
+   }
+  },
+  "lfm2": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 59,
+     "error": 0
+    }
+   }
+  },
+  "mellum": {
+   "cases": 7332,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 225,
+     "error": 0
+    }
+   }
+  },
+  "minicpm5": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 59,
+     "error": 0
+    }
+   }
+  },
+  "minimax-m2": {
+   "cases": 7710,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 57,
+     "error": 0
+    }
+   }
+  },
+  "mistral-7b": {
+   "cases": 6996,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 6750,
+     "error": 0
+    }
+   }
+  },
+  "modernbert": {
+   "cases": 7649,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 6,
+     "decode": 241,
+     "error": 0
+    }
+   }
+  },
+  "north-mini-code": {
+   "cases": 7472,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 59,
+     "error": 0
+    }
+   }
+  },
+  "ollama-gemma4": {
+   "cases": 7290,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "ollama-laguna": {
+   "cases": 7791,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 1699,
+     "error": 0
+    }
+   }
+  },
+  "ollama-muse": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 56,
+     "error": 0
+    }
+   }
+  },
+  "ollama-nemotron3.5": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 59,
+     "error": 0
+    }
+   }
+  },
+  "ollama-nimble": {
+   "cases": 7416,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 57,
+     "error": 0
+    }
+   }
+  },
+  "ollama-north": {
+   "cases": 7472,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 59,
+     "error": 0
+    }
+   }
+  },
+  "ollama-qwen3.5": {
+   "cases": 7318,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 55,
+     "error": 0
+    }
+   }
+  },
+  "ollama-qwen3.8": {
+   "cases": 7416,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 57,
+     "error": 0
+    }
+   }
+  },
+  "olmo": {
+   "cases": 7201,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 250,
+     "error": 0
+    }
+   }
+  },
+  "olmo2": {
+   "cases": 7262,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 51,
+     "error": 0
+    }
+   }
+  },
+  "phi-2": {
+   "cases": 7291,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 246,
+     "error": 0
+    }
+   }
+  },
+  "phi-3": {
+   "cases": 7150,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 7091,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "phi-4": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 933,
+     "decode": 47,
+     "error": 0
+    }
+   }
+  },
+  "qwen1.5": {
+   "cases": 6996,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 51,
+     "error": 0
+    }
+   }
+  },
+  "qwen2.5": {
+   "cases": 7262,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 51,
+     "error": 0
+    }
+   }
+  },
+  "qwen3": {
+   "cases": 7318,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 55,
+     "error": 0
+    }
+   }
+  },
+  "qwen3-embedding": {
+   "cases": 7318,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 55,
+     "error": 0
+    }
+   }
+  },
+  "seed-coder": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 143,
+     "error": 0
+    }
+   }
+  },
+  "solar-open": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 56,
+     "error": 0
+    }
+   }
+  },
+  "stablelm2": {
+   "cases": 7416,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 221,
+     "error": 0
+    }
+   }
+  },
+  "tekken": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 59,
+     "error": 0
+    }
+   }
+  },
+  "trillion": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "ollama-mlx": {
+     "encode": 0,
+     "decode": 55,
+     "error": 0
+    }
+   }
+  }
+ },
+ "finished": "2026-10-17T21:29:07"
+}

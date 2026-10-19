@@ -1,0 +1,585 @@
+{
+ "started": "2026-10-17T21:07:43",
+ "versions": {
+  "ollama": "d1ed3fd13ac73f60cff00bbead8af24a68c4200d 2026-10-16",
+  "llama.cpp": "f74e2fa6a31cc33ab4ee4ae516641cfe62df3924 2026-10-16",
+  "tokenizers": "0.23.3"
+ },
+ "seed": 0,
+ "generated": 5000,
+ "tokenizers": {
+  "bailingmoe2": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[bailingmoe2.gguf]": {
+     "encode": 665,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "bge-small": {
+   "cases": 7024,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[bge-small.gguf]": {
+     "encode": 679,
+     "decode": 4714,
+     "error": 0
+    }
+   }
+  },
+  "deepseek-coder": {
+   "cases": 7237,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ggml-vocab-deepseek-coder.gguf]": {
+     "encode": 0,
+     "decode": 723,
+     "error": 0
+    }
+   }
+  },
+  "deepseek-llm": {
+   "cases": 7139,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ggml-vocab-deepseek-llm.gguf]": {
+     "encode": 96,
+     "decode": 985,
+     "error": 0
+    }
+   }
+  },
+  "deepseek-r1-qwen": {
+   "cases": 7262,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[deepseek-r1-qwen.gguf]": {
+     "encode": 669,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "deepseek-v3": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[deepseek-v3.gguf]": {
+     "encode": 0,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "exaone4": {
+   "cases": 7585,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[exaone4.gguf]": {
+     "encode": 0,
+     "decode": 153,
+     "error": 0
+    }
+   }
+  },
+  "falcon": {
+   "cases": 7122,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[falcon.gguf]": {
+     "encode": 20,
+     "decode": 151,
+     "error": 0
+    }
+   }
+  },
+  "falcon-h1": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[falcon-h1.gguf]": {
+     "encode": 503,
+     "decode": 9,
+     "error": 0
+    }
+   }
+  },
+  "falcon3": {
+   "cases": 7791,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[falcon3.gguf]": {
+     "encode": 731,
+     "decode": 12,
+     "error": 0
+    }
+   }
+  },
+  "gemma4-dfm": {
+   "cases": 7290,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[gemma4-dfm.gguf]": {
+     "encode": 0,
+     "decode": 4606,
+     "error": 0
+    }
+   }
+  },
+  "glm4": {
+   "cases": 7150,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[glm4.gguf]": {
+     "encode": 0,
+     "decode": 162,
+     "error": 0
+    }
+   }
+  },
+  "glm4.5": {
+   "cases": 7458,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[glm4.5.gguf]": {
+     "encode": 0,
+     "decode": 153,
+     "error": 0
+    }
+   }
+  },
+  "glm4.7": {
+   "cases": 7458,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[glm4.7.gguf]": {
+     "encode": 0,
+     "decode": 153,
+     "error": 0
+    }
+   }
+  },
+  "gpt-oss": {
+   "cases": 7248,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[gpt-oss.gguf]": {
+     "encode": 271,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "gpt2": {
+   "cases": 6968,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[gpt2.gguf]": {
+     "encode": 0,
+     "decode": 157,
+     "error": 0
+    }
+   }
+  },
+  "granite-docling": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[granite-docling.gguf]": {
+     "encode": 0,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "kanana2": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[kanana2.gguf]": {
+     "encode": 165,
+     "decode": 160,
+     "error": 0
+    }
+   }
+  },
+  "laguna": {
+   "cases": 7791,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[laguna.gguf]": {
+     "encode": 341,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "lfm2": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[lfm2.gguf]": {
+     "encode": 0,
+     "decode": 165,
+     "error": 0
+    }
+   }
+  },
+  "mellum": {
+   "cases": 7332,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[mellum.gguf]": {
+     "encode": 0,
+     "decode": 18,
+     "error": 0
+    }
+   }
+  },
+  "minicpm5": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[minicpm5.gguf]": {
+     "encode": 0,
+     "decode": 165,
+     "error": 0
+    }
+   }
+  },
+  "minimax-m2": {
+   "cases": 7710,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[minimax-m2.gguf]": {
+     "encode": 691,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "mistral-7b": {
+   "cases": 6996,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[mistral-7b.gguf]": {
+     "encode": 1180,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "modernbert": {
+   "cases": 7649,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[modernbert.gguf]": {
+     "encode": 661,
+     "decode": 18,
+     "error": 0
+    }
+   }
+  },
+  "north-mini-code": {
+   "cases": 7472,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[north-mini-code.gguf]": {
+     "encode": 261,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "ollama-gemma4": {
+   "cases": 7290,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ollama-gemma4.gguf]": {
+     "encode": 0,
+     "decode": 151,
+     "error": 0
+    }
+   }
+  },
+  "ollama-laguna": {
+   "cases": 7791,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ollama-laguna.gguf]": {
+     "encode": 341,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "ollama-muse": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ollama-muse.gguf]": {
+     "encode": 275,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "ollama-nemotron3.5": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ollama-nemotron3.5.gguf]": {
+     "encode": 293,
+     "decode": 152,
+     "error": 0
+    }
+   }
+  },
+  "ollama-north": {
+   "cases": 7472,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ollama-north.gguf]": {
+     "encode": 261,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "ollama-qwen3.5": {
+   "cases": 7318,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ollama-qwen3.5.gguf]": {
+     "encode": 663,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "ollama-qwen3.8": {
+   "cases": 7416,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[ollama-qwen3.8.gguf]": {
+     "encode": 665,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "olmo": {
+   "cases": 7201,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[olmo.gguf]": {
+     "encode": 661,
+     "decode": 18,
+     "error": 0
+    }
+   }
+  },
+  "olmo2": {
+   "cases": 7262,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[olmo2.gguf]": {
+     "encode": 0,
+     "decode": 146,
+     "error": 0
+    }
+   }
+  },
+  "phi-2": {
+   "cases": 7291,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[phi-2.gguf]": {
+     "encode": 0,
+     "decode": 14,
+     "error": 0
+    }
+   }
+  },
+  "phi-3": {
+   "cases": 7150,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[phi-3.gguf]": {
+     "encode": 164,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "phi-4": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[phi-4.gguf]": {
+     "encode": 933,
+     "decode": 136,
+     "error": 0
+    }
+   }
+  },
+  "qwen1.5": {
+   "cases": 6996,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[qwen1.5.gguf]": {
+     "encode": 662,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "qwen2.5": {
+   "cases": 7262,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[qwen2.5.gguf]": {
+     "encode": 669,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "qwen3": {
+   "cases": 7318,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[qwen3.gguf]": {
+     "encode": 663,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "qwen3-embedding": {
+   "cases": 7318,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[qwen3-embedding.gguf]": {
+     "encode": 663,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "refact": {
+   "cases": 7220,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[refact.gguf]": {
+     "encode": 0,
+     "decode": 13,
+     "error": 0
+    }
+   }
+  },
+  "seed-coder": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[seed-coder.gguf]": {
+     "encode": 681,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "smollm": {
+   "cases": 7192,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[smollm.gguf]": {
+     "encode": 0,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "smollm2": {
+   "cases": 7192,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[smollm2.gguf]": {
+     "encode": 0,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "solar-open": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[solar-open.gguf]": {
+     "encode": 0,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "stablelm2": {
+   "cases": 7416,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[stablelm2.gguf]": {
+     "encode": 0,
+     "decode": 11,
+     "error": 0
+    }
+   }
+  },
+  "starcoder2": {
+   "cases": 7486,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[starcoder2.gguf]": {
+     "encode": 0,
+     "decode": 13,
+     "error": 0
+    }
+   }
+  },
+  "superbpe": {
+   "cases": 7024,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[superbpe.gguf]": {
+     "encode": 9,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "tekken": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[tekken.gguf]": {
+     "encode": 273,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  },
+  "trillion": {
+   "cases": 7794,
+   "reference_errors": 0,
+   "engines": {
+    "llama.cpp[trillion.gguf]": {
+     "encode": 0,
+     "decode": 0,
+     "error": 0
+    }
+   }
+  }
+ },
+ "finished": "2026-10-17T21:10:34"
+}

@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+data/
+conv/
+infercheck-data.tar.gz
+harness/llama_tok/llamatok
+harness/ollama_tok/ollamatok
+harness/ollama_tok/go.local.mod
+harness/ollama_tok/go.local.sum
+results/run*/
+parts/

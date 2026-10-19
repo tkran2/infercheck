@@ -1,0 +1,44 @@
+| tokenizer | engine | cases | encode before | encode after | decode before | decode after |
+|---|---|---:|---:|---:|---:|---:|
+| deepseek-r1-qwen | ollama-mlx | 7262 | 0 | 0 | 278 | 51 |
+| deepseek-v3 | ollama-mlx | 7794 | 0 | 0 | 1655 | 56 |
+| exaone4 | ollama-mlx | 7585 | 0 | 0 | 52 | 52 |
+| glm4 | ollama-mlx | 7150 | 0 | 0 | 56 | 56 |
+| glm4.5 | ollama-mlx | 7458 | 0 | 0 | 56 | 56 |
+| glm4.7 | ollama-mlx | 7458 | 0 | 0 | 56 | 56 |
+| gpt-4o | ollama-mlx | 6982 | 0 | 0 | 56 | 56 |
+| gpt-oss | ollama-mlx | 7248 | 0 | 0 | 54 | 54 |
+| granite-docling | ollama-mlx | 7794 | 0 | 0 | 51 | 51 |
+| grok-2 | ollama-mlx | 7794 | 0 | 0 | 56 | 56 |
+| hunyuan | ollama-mlx | 7794 | 0 | 0 | 224 | 224 |
+| kanana2 | ollama-mlx | 7794 | 0 | 0 | 222 | 222 |
+| laguna | ollama-mlx | 7791 | 0 | 0 | 1699 | 57 |
+| lfm2 | ollama-mlx | 7794 | 0 | 0 | 59 | 59 |
+| mellum | ollama-mlx | 7332 | 0 | 0 | 225 | 225 |
+| minicpm5 | ollama-mlx | 7794 | 0 | 0 | 59 | 59 |
+| minimax-m2 | ollama-mlx | 7710 | 0 | 0 | 57 | 57 |
+| mistral-7b | ollama-mlx | 6996 | 0 | 0 | 6750 | 6750 |
+| modernbert | ollama-mlx | 7649 | 6 | 6 | 241 | 241 |
+| north-mini-code | ollama-mlx | 7472 | 0 | 0 | 59 | 59 |
+| ollama-laguna | ollama-mlx | 7791 | 0 | 0 | 1699 | 57 |
+| ollama-muse | ollama-mlx | 7794 | 0 | 0 | 56 | 56 |
+| ollama-nemotron3.5 | ollama-mlx | 7794 | 0 | 0 | 59 | 59 |
+| ollama-nimble | ollama-mlx | 7416 | 0 | 0 | 57 | 57 |
+| ollama-north | ollama-mlx | 7472 | 0 | 0 | 59 | 59 |
+| ollama-qwen3.5 | ollama-mlx | 7318 | 0 | 0 | 55 | 55 |
+| ollama-qwen3.8 | ollama-mlx | 7416 | 0 | 0 | 57 | 57 |
+| olmo | ollama-mlx | 7201 | 0 | 0 | 250 | 250 |
+| olmo2 | ollama-mlx | 7262 | 0 | 0 | 51 | 51 |
+| phi-2 | ollama-mlx | 7291 | 0 | 0 | 246 | 246 |
+| phi-3 | ollama-mlx | 7150 | 7091 | 7091 | 0 | 0 |
+| phi-4 | ollama-mlx | 7794 | 933 | 933 | 47 | 47 |
+| qwen1.5 | ollama-mlx | 6996 | 0 | 0 | 51 | 51 |
+| qwen2.5 | ollama-mlx | 7262 | 0 | 0 | 51 | 51 |
+| qwen3 | ollama-mlx | 7318 | 0 | 0 | 55 | 55 |
+| qwen3-embedding | ollama-mlx | 7318 | 0 | 0 | 55 | 55 |
+| seed-coder | ollama-mlx | 7794 | 0 | 0 | 143 | 56 |
+| solar-open | ollama-mlx | 7794 | 0 | 0 | 56 | 56 |
+| stablelm2 | ollama-mlx | 7416 | 0 | 0 | 221 | 221 |
+| tekken | ollama-mlx | 7794 | 0 | 0 | 59 | 59 |
+| trillion | ollama-mlx | 7794 | 0 | 0 | 55 | 55 |
+| **total** | | | **8030** | **8030** | **15347** | **10150** |

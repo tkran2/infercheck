@@ -1,0 +1,106 @@
+{
+ "gpt-oss": {
+  "Hindi": {
+   "hf": 15,
+   "master": 28,
+   "patched": 15
+  },
+  "Bengali": {
+   "hf": 9,
+   "master": 18,
+   "patched": 9
+  },
+  "Tamil": {
+   "hf": 11,
+   "master": 17,
+   "patched": 11
+  },
+  "Telugu": {
+   "hf": 8,
+   "master": 15,
+   "patched": 8
+  },
+  "Thai": {
+   "hf": 12,
+   "master": 16,
+   "patched": 12
+  },
+  "Khmer": {
+   "hf": 17,
+   "master": 19,
+   "patched": 17
+  },
+  "Arabic (vowelled)": {
+   "hf": 23,
+   "master": 23,
+   "patched": 23
+  },
+  "Hebrew (niqqud)": {
+   "hf": 15,
+   "master": 15,
+   "patched": 15
+  },
+  "Vietnamese": {
+   "hf": 8,
+   "master": 8,
+   "patched": 8
+  },
+  "English": {
+   "hf": 10,
+   "master": 10,
+   "patched": 10
+  }
+ },
+ "Mistral NeMo (tekken)": {
+  "Hindi": {
+   "hf": 16,
+   "master": 27,
+   "patched": 16
+  },
+  "Bengali": {
+   "hf": 15,
+   "master": 19,
+   "patched": 15
+  },
+  "Tamil": {
+   "hf": 15,
+   "master": 20,
+   "patched": 15
+  },
+  "Telugu": {
+   "hf": 11,
+   "master": 15,
+   "patched": 11
+  },
+  "Thai": {
+   "hf": 15,
+   "master": 18,
+   "patched": 15
+  },
+  "Khmer": {
+   "hf": 75,
+   "master": 75,
+   "patched": 75
+  },
+  "Arabic (vowelled)": {
+   "hf": 20,
+   "master": 21,
+   "patched": 20
+  },
+  "Hebrew (niqqud)": {
+   "hf": 18,
+   "master": 18,
+   "patched": 18
+  },
+  "Vietnamese": {
+   "hf": 9,
+   "master": 9,
+   "patched": 9
+  },
+  "English": {
+   "hf": 10,
+   "master": 10,
+   "patched": 10
+  }
+ }
+}
