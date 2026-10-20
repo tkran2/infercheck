@@ -4,6 +4,8 @@
   infercheck vocab  --data DIR --out results/   decode every token id alone, against Hugging Face
   infercheck list   --data DIR                  what is available to test
   infercheck compare BEFORE AFTER               per-tokenizer disagreement counts of two tok runs (Markdown)
+  infercheck hub-scan --top 500 --out DIR       audit the most-downloaded GGUF repos on Hugging Face
+  infercheck hub-report DIR                     Markdown report of a hub-scan
 
 DIR is the unpacked data/ folder from scripts/mac_fetch.sh: tokenizers/<name>/tokenizer.json,
 tokenizers/ggml-vocabs/**.gguf and ollama-gguf/*.gguf.
@@ -207,7 +209,25 @@ def main(argv=None) -> int:
     p = sub.add_parser("compare")
     p.add_argument("before")
     p.add_argument("after")
+    p = sub.add_parser("hub-scan", help="audit GGUF repos on the Hugging Face Hub (reads only file headers)")
+    p.add_argument("--top", type=int, default=500, help="the N most-downloaded GGUF repos")
+    p.add_argument("--repos", nargs="*", help="check these repos instead of the top N")
+    p.add_argument("--out", default="results/hub")
+    p.add_argument("--n", type=int, default=300, help="generated cases per repo (plus ~2,000 fixed probes)")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--max-shrink", type=int, default=15)
+    p = sub.add_parser("hub-report", help="Markdown report of a hub-scan output folder")
+    p.add_argument("out", nargs="?", default="results/hub")
     args = ap.parse_args(argv)
+    if args.cmd == "hub-scan":
+        from .hub import scan
+        return scan(args.top, Path(args.out), args.n, args.seed, args.repos, args.max_shrink)
+    if args.cmd == "hub-report":
+        from .hub import report
+        text = report(Path(args.out))
+        (Path(args.out) / "report.md").write_text(text, encoding="utf-8")
+        print(text, end="")
+        return 0
     return {"list": cmd_list, "tok": cmd_tok, "vocab": cmd_vocab, "compare": cmd_compare}[args.cmd](args)
 
 

@@ -9,3 +9,4 @@ harness/ollama_tok/go.local.mod
 harness/ollama_tok/go.local.sum
 results/run*/
 parts/
+results/*/hf-cache/
