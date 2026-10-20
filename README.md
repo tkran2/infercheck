@@ -65,6 +65,8 @@ python -m infercheck.cli hub-report results/hub                   # writes resul
 
 The report lists every repo where llama.cpp disagrees with the source tokenizer (sorted by downloads, with a rough cause for each finding: combining marks, NFC, digits, whitespace, CRLF, special tokens), grouped by architecture and pre-tokenizer, plus every repo whose source tokenizer differs from its base model. Gated base models need `hf auth login` with access granted.
 
+`hub-scan` needs the llama.cpp harness (`harness/llama_tok/llamatok`, built as under Reproduce) and stops before scanning if it is missing or does not run. Re-running a scan into the same folder skips finished repos and retries the ones that failed. On macOS, if linking fails with `tapi error: malformed file ... unknown architecture`, the default SDK is newer than the linker; add `-isysroot` with the SDK CMake used for llama.cpp (printed as `BLAS found, Libraries: .../SDKs/MacOSX<version>.sdk/...`).
+
 ## Reproduce
 
 Hugging Face downloads happen on a machine with internet access (`scripts/mac_fetch.sh`). The test machine needs no network.

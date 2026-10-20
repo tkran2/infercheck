@@ -18,6 +18,8 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import subprocess
+import sys
 import tempfile
 import time
 import unicodedata
@@ -317,13 +319,47 @@ def check_repo(repo: str, downloads: int, out: Path, cache: Path, memo: dict, n_
 
 # ----------------------------------------------------------------------------- commands
 
+RETRY = {"engine-error", "error", "header-error"}
+
+
+def _latest(recs_path: Path) -> list[dict]:
+    """One record per repo (the most recent line wins), in first-seen order."""
+    if not recs_path.exists():
+        return []
+    by_repo: dict = {}
+    for line in recs_path.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            r = json.loads(line)
+            by_repo[r["repo"]] = r
+    return list(by_repo.values())
+
+
+def engine_problem() -> str | None:
+    """Return a message if the llama.cpp harness cannot run, so a scan does not record hundreds of engine errors."""
+    from .engines import LlamaCppTokenizer
+    b = LlamaCppTokenizer.BIN
+    if not b.exists():
+        return (f"llama.cpp harness not found at {b}.\nBuild it first (see README, 'Auditing GGUF files on Hugging Face'), "
+                "or point INFERCHECK_LLAMATOK at an existing build.")
+    try:
+        p = subprocess.run([str(b)], input="", capture_output=True, text=True, timeout=30)
+    except OSError as exc:
+        return f"llama.cpp harness at {b} does not run: {exc}"
+    if p.returncode < 0 or "dyld" in p.stderr or "Library not loaded" in p.stderr:
+        return f"llama.cpp harness at {b} does not run: {p.stderr.strip()[:300]}"
+    return None
+
+
 def scan(top: int, out: Path, n_gen: int, seed: int, repos: list[str] | None = None, max_shrink: int = 15) -> int:
     out.mkdir(parents=True, exist_ok=True)
     cache = out / "hf-cache"
     recs_path = out / "records.jsonl"
-    done = set()
-    if recs_path.exists():
-        done = {json.loads(l)["repo"] for l in recs_path.read_text(encoding="utf-8").splitlines() if l.strip()}
+    problem = engine_problem()
+    if problem:
+        print(problem, file=sys.stderr)
+        return 2
+    # resume: skip repos already finished; retry the ones that failed for engine or network reasons
+    done = {r["repo"] for r in _latest(recs_path) if r["status"] not in RETRY}
     targets = [{"id": r, "downloads": 0} for r in repos] if repos else top_gguf_repos(top)
     memo: dict = {}
     t0 = time.time()
@@ -340,7 +376,8 @@ def scan(top: int, out: Path, n_gen: int, seed: int, repos: list[str] | None = N
             e = rec.get("engine", {})
             print(f"[{i}/{len(targets)} {time.time() - t0:5.0f}s] {t['id']}: {rec['status']}"
                   + (f" pre={rec.get('pre')} encode={e.get('encode')} decode={e.get('decode')}" if e else "")
-                  + (" DRIFT" if rec.get("drift") else ""), flush=True)
+                  + (" DRIFT" if rec.get("drift") else "")
+                  + (f" ({rec['error'][:100]})" if rec["status"] in RETRY and rec.get("error") else ""), flush=True)
     return 0
 
 
@@ -353,7 +390,7 @@ def _fmt_ex(ex: dict) -> str:
 
 
 def report(out: Path) -> str:
-    recs = [json.loads(l) for l in (out / "records.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]
+    recs = _latest(out / "records.jsonl")
     ok = [r for r in recs if r["status"] == "ok"]
     bad = [r for r in ok if (r["engine"].get("encode") or 0) + (r["engine"].get("decode") or 0) + (r["engine"].get("error") or 0)]
     drifted = [r for r in recs if r.get("drift")]

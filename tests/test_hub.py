@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 
 from infercheck.ggufhdr import ARR, STR, U32, GGUFFormatError, file_fetcher, read_header, write_vocab_only
-from infercheck.hub import classify, hf_repo_from_url
+from infercheck import hub
+from infercheck.hub import _latest, classify, hf_repo_from_url
 
 
 def _s(text: str) -> bytes:
@@ -70,6 +71,29 @@ class TestHelpers(unittest.TestCase):
         self.assertEqual(hf_repo_from_url("https://huggingface.co/Qwen/Qwen3-8B"), "Qwen/Qwen3-8B")
         self.assertIsNone(hf_repo_from_url("https://github.com/x/y"))
         self.assertIsNone(hf_repo_from_url(None))
+
+
+class TestScanBookkeeping(unittest.TestCase):
+    def test_latest_record_wins(self):
+        with tempfile.TemporaryDirectory() as td:
+            p = Path(td) / "records.jsonl"
+            p.write_text('{"repo": "a/b", "status": "engine-error"}\n{"repo": "c/d", "status": "no-gguf"}\n'
+                         '{"repo": "a/b", "status": "ok"}\n', encoding="utf-8")
+            recs = _latest(p)
+            self.assertEqual([(r["repo"], r["status"]) for r in recs], [("a/b", "ok"), ("c/d", "no-gguf")])
+            self.assertEqual(_latest(Path(td) / "missing.jsonl"), [])
+
+    def test_missing_harness_stops_scan(self):
+        from infercheck.engines import LlamaCppTokenizer
+        old = LlamaCppTokenizer.BIN
+        try:
+            LlamaCppTokenizer.BIN = Path("/nonexistent/llamatok")
+            self.assertIn("not found", hub.engine_problem())
+            with tempfile.TemporaryDirectory() as td:
+                self.assertEqual(hub.scan(1, Path(td), 1, 0, repos=["x/y"]), 2)
+                self.assertFalse((Path(td) / "records.jsonl").exists())
+        finally:
+            LlamaCppTokenizer.BIN = old
 
 
 if __name__ == "__main__":
