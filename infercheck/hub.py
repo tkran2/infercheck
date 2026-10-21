@@ -432,7 +432,7 @@ def scan(top: int, out: Path, n_gen: int, seed: int, repos: list[str] | None = N
             print(f"[{i}/{len(targets)} {time.time() - t0:5.0f}s] {t['id']}: {rec['status']}"
                   + (f" pre={rec.get('pre')} encode={e.get('encode')} decode={e.get('decode')}" if e else "")
                   + (" DRIFT" if rec.get("drift") else "")
-                  + (f" ({rec['error'][:100]})" if rec["status"] in RETRY and rec.get("error") else ""), flush=True)
+                  + (f" ({rec['error'][:240]})" if rec["status"] in RETRY and rec.get("error") else ""), flush=True)
     return 0
 
 

@@ -134,5 +134,22 @@ class TestCauses(unittest.TestCase):
         self.assertIn("| b/load | 20 |", text)
 
 
+class TestSplit(unittest.TestCase):
+    def test_split_keys_dropped(self):
+        kv = _s("split.count") + struct.pack("<I", 2) + struct.pack("<H", 3)   # u16
+        kv += _s("general.architecture") + struct.pack("<I", STR) + _s("llama")
+        kv += _s("split.no") + struct.pack("<I", 2) + struct.pack("<H", 0)
+        data = b"GGUF" + struct.pack("<IQQ", 3, 4, 3) + kv + b"\0" * 64
+        with tempfile.TemporaryDirectory() as td:
+            src = Path(td) / "m-00001-of-00003.gguf"
+            src.write_bytes(data)
+            h = read_header(file_fetcher(src))
+            self.assertEqual(h.get("split.count"), 3)
+            out = write_vocab_only(h, Path(td) / "v.gguf")
+            h2 = read_header(file_fetcher(out))
+            self.assertEqual(h2.n_kv, 1)
+            self.assertEqual(h2.kv, {"general.architecture": "llama"})
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -23,7 +23,14 @@ static int hexval(char c) {
     return -1;
 }
 
-static void quiet_log(enum ggml_log_level, const char *, void *) {}
+// llama.cpp's own log is silenced, but its warnings and errors are kept so a failed load can say why.
+static std::string g_log;
+static void quiet_log(enum ggml_log_level level, const char * text, void *) {
+    if (level == GGML_LOG_LEVEL_ERROR || level == GGML_LOG_LEVEL_WARN) {
+        g_log += text;
+        if (g_log.size() > 2000) g_log.erase(0, g_log.size() - 2000);
+    }
+}
 
 int main(int argc, char ** argv) {
     if (argc < 2 || argc > 3 || (argc == 3 && std::string(argv[2]) != "--decode")) {
@@ -37,7 +44,8 @@ int main(int argc, char ** argv) {
     mp.vocab_only = true;
     llama_model * model = llama_model_load_from_file(argv[1], mp);
     if (!model) {
-        fprintf(stderr, "failed to load %s\n", argv[1]);
+        for (char & c : g_log) if (c == '\n') c = ' ';
+        fprintf(stderr, "llama.cpp failed to load the model: %s\n", g_log.c_str());
         return 3;
     }
     const llama_vocab * vocab = llama_model_get_vocab(model);

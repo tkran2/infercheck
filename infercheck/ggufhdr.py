@@ -84,6 +84,7 @@ class GGUFHeader:
     kv: dict = field(default_factory=dict)
     kv_bytes: bytes = b""          # the raw key/value section, exactly as in the file
     n_kv: int = 0
+    kv_spans: list = field(default_factory=list)  # (key, start, end) of each pair within kv_bytes
 
     def get(self, key: str, default=None):
         return self.kv.get(key, default)
@@ -113,20 +114,28 @@ def read_header(fetch: Callable[[int, int], bytes], **kw) -> GGUFHeader:
     n_kv = r.unpack("<Q")
     start = r.pos
     kv = {}
+    spans = []
     for _ in range(n_kv):
+        p0 = r.pos - start
         klen = r.unpack("<Q")
         key = r.take(klen).decode("utf-8", "surrogateescape")
         vtype = r.unpack("<I")
         kv[key] = _read_value(r, vtype)
-    return GGUFHeader(version, n_tensors, kv, bytes(r.buf[start:r.pos]), n_kv)
+        spans.append((key, p0, r.pos - start))
+    return GGUFHeader(version, n_tensors, kv, bytes(r.buf[start:r.pos]), n_kv, spans)
 
 
 def write_vocab_only(header: GGUFHeader, path: str | Path, alignment: int = 32) -> Path:
-    """Write a GGUF with the same key/value pairs and no tensors (what --vocab-only produces)."""
+    """Write a GGUF with the same key/value pairs and no tensors (what --vocab-only produces).
+    The split.* keys of a sharded model are left out: with them, llama.cpp looks for the other shards."""
     path = Path(path)
+    spans = header.kv_spans or [(None, 0, len(header.kv_bytes))]
+    keep = [(a, b) for k, a, b in spans if not (k or "").startswith("split.")]
+    n_kv = header.n_kv - (len(spans) - len(keep)) if header.kv_spans else header.n_kv
     out = bytearray(b"GGUF")
-    out += struct.pack("<IQQ", header.version, 0, header.n_kv)
-    out += header.kv_bytes
+    out += struct.pack("<IQQ", header.version, 0, n_kv)
+    for a, b in keep:
+        out += header.kv_bytes[a:b]
     pad = (-len(out)) % int(header.kv.get("general.alignment", alignment) or alignment)
     out += b"\0" * pad
     path.write_bytes(bytes(out))
