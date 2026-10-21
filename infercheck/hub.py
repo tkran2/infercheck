@@ -189,6 +189,52 @@ def classify(minimal: str, special: list[str]) -> str:
     return "other"
 
 
+def _llama_cleanup(s: str) -> str:
+    """What llama.cpp's detokenizer does when clean_spaces is on (llama-vocab.cpp, three passes)."""
+    s = re.sub(r" ([?!.,])", r"\1", s)
+    s = s.replace(" ' ", "'")
+    return re.sub(r" '(s|m|re|ve)", r"'\1", s)
+
+
+def cause_of(f, special: list[str]) -> str:
+    """Cause of one finding. Unlike classify(), this checks the two causes that explain most findings across
+    the Hub first: the reference normalizes to NFC (llama.cpp's BPE path does not), and llama.cpp's detokenizer
+    cleans up spaces before punctuation when the source tokenizer does not."""
+    if f.kind == "error":
+        return "engine-error"
+    if f.kind == "decode":
+        ref = f.min_ref_decoded if f.min_ref_decoded is not None else f.ref_decoded
+        got = f.min_got_decoded if f.min_got_decoded is not None else f.got_decoded
+        if ref is not None and got is not None and got != ref and _llama_cleanup(ref) == got:
+            return "decode-cleanup"
+    text = f.minimal or f.text
+    if unicodedata.normalize("NFC", text) != text:
+        return "nfc"
+    return classify(text, special)
+
+
+CAUSES = {
+    "nfc": "the source tokenizer normalizes text to NFC; llama.cpp's BPE tokenizer does not "
+           "(ggml-org/llama.cpp#30747, fix in review in #30708)",
+    "decode-cleanup": "llama.cpp's detokenizer removes the space before . , ! ? and 's 'm 're 've "
+                      "(clean_up_tokenization_spaces) although the source tokenizer leaves it off",
+    "special-token": "text next to added or special tokens (lstrip/rstrip and normalization flags)",
+    "crlf": "carriage returns",
+    "digits": "digit grouping",
+    "combining-mark": "combining marks",
+    "apostrophe": "apostrophes and contractions",
+    "whitespace": "runs of whitespace",
+    "whitespace+text": "whitespace followed by text",
+    "other": "other",
+}
+
+
+def _load_failed(r: dict) -> bool:
+    """llama.cpp could not load the vocabulary (every case errored), as opposed to tokenizing differently."""
+    e = r.get("engine") or {}
+    return r.get("status") == "engine-error" or (bool(e.get("cases")) and (e.get("error") or 0) >= 0.5 * e["cases"])
+
+
 def _sha(b: bytes) -> str:
     return hashlib.sha1(b).hexdigest()[:16]
 
@@ -236,11 +282,17 @@ def run_engine_check(vocab_gguf: Path, ref_tj: Path, n_gen: int, seed: int, max_
     findings, stats = compare(ref, [eng], cases, shrink=max_shrink > 0, max_shrink=max_shrink, log=lambda *a, **k: None)
     s = stats["engines"].get("llama.cpp", {})
     classes: dict = {}
+    causes: dict = {}
     for f in findings:
         c = classify(f.minimal, special)
         classes[c] = classes.get(c, 0) + 1
-        f.cls = c
-    return {"cases": stats["cases"], **s, "reference_errors": stats["reference_errors"], "classes": classes}, findings
+        f.cls = cause_of(f, special)
+        causes[f.cls] = causes.get(f.cls, 0) + 1
+    result = {"cases": stats["cases"], **s, "reference_errors": stats["reference_errors"], "classes": classes, "causes": causes}
+    err = next((f.got_error or f.min_got_error for f in findings if f.kind == "error" and (f.got_error or f.min_got_error)), None)
+    if err:
+        result["error_sample"] = err[:300]
+    return result, findings
 
 
 def check_repo(repo: str, downloads: int, out: Path, cache: Path, memo: dict, n_gen: int = 300, seed: int = 0,
@@ -296,6 +348,9 @@ def check_repo(repo: str, downloads: int, out: Path, cache: Path, memo: dict, n_
             stats, findings = run_engine_check(vg, src_tj, n_gen, seed, max_shrink)
         except Exception as exc:
             return {**rec, "status": "engine-error", "error": str(exc)[:300]}
+        if _load_failed({"engine": stats}):
+            return {**rec, "status": "engine-error", "engine": stats,
+                    "error": "llama.cpp could not load the vocabulary: " + (stats.get("error_sample") or "?")}
         base_stats = None
         if rec.get("drift") and base_tj:  # llama.cpp may match the base model rather than the drifted source
             try:
@@ -327,7 +382,7 @@ def _latest(recs_path: Path) -> list[dict]:
     if not recs_path.exists():
         return []
     by_repo: dict = {}
-    for line in recs_path.read_text(encoding="utf-8").splitlines():
+    for line in recs_path.read_text(encoding="utf-8").split("\n"):
         if line.strip():
             r = json.loads(line)
             by_repo[r["repo"]] = r
@@ -359,7 +414,7 @@ def scan(top: int, out: Path, n_gen: int, seed: int, repos: list[str] | None = N
         print(problem, file=sys.stderr)
         return 2
     # resume: skip repos already finished; retry the ones that failed for engine or network reasons
-    done = {r["repo"] for r in _latest(recs_path) if r["status"] not in RETRY}
+    done = {r["repo"] for r in _latest(recs_path) if r["status"] not in RETRY and not _load_failed(r)}
     targets = [{"id": r, "downloads": 0} for r in repos] if repos else top_gguf_repos(top)
     memo: dict = {}
     t0 = time.time()
@@ -389,29 +444,78 @@ def _fmt_ex(ex: dict) -> str:
     return f"`{shown}` ({ex.get('class') or ex['kind']})"
 
 
+def _causes(r: dict, out: Path, by_signature: dict) -> dict:
+    """Causes for a record. Records written before causes were recorded get them from the findings file,
+    or from another repo with the same tokenizer result when the result was reused from memory."""
+    e = r["engine"]
+    if e.get("causes") is not None:
+        return e["causes"]
+    f = out / "findings" / (r["repo"].replace("/", "__") + ".jsonl")
+    if f.exists():
+        from types import SimpleNamespace
+        causes: dict = {}
+        for line in f.read_text(encoding="utf-8").split("\n"):
+            if line.strip():
+                c = cause_of(SimpleNamespace(**json.loads(line)), [])
+                causes[c] = causes.get(c, 0) + 1
+        return causes
+    return by_signature.get(_signature(r), e.get("classes") or {})
+
+
+def _signature(r: dict):
+    e = r["engine"]
+    return (r.get("pre"), e.get("encode"), e.get("decode"), tuple(sorted((e.get("classes") or {}).items())))
+
+
 def report(out: Path) -> str:
     recs = _latest(out / "records.jsonl")
-    ok = [r for r in recs if r["status"] == "ok"]
-    bad = [r for r in ok if (r["engine"].get("encode") or 0) + (r["engine"].get("decode") or 0) + (r["engine"].get("error") or 0)]
+    failed = [r for r in recs if _load_failed(r)]
+    ok = [r for r in recs if r["status"] == "ok" and not _load_failed(r)]
+    bad = [r for r in ok if (r["engine"].get("encode") or 0) + (r["engine"].get("decode") or 0)]
     drifted = [r for r in recs if r.get("drift")]
-    statuses = {}
+    statuses: dict = {}
     for r in recs:
-        statuses[r["status"]] = statuses.get(r["status"], 0) + 1
+        st = "engine-error" if _load_failed(r) else r["status"]
+        statuses[st] = statuses.get(st, 0) + 1
+
+    by_signature: dict = {}
+    for r in bad:
+        f = out / "findings" / (r["repo"].replace("/", "__") + ".jsonl")
+        if r["engine"].get("causes") is not None or f.exists():
+            by_signature.setdefault(_signature(r), _causes(r, out, {}))
+    causes_of = {r["repo"]: _causes(r, out, by_signature) for r in bad}
+
     lines = ["# GGUF tokenizer audit", "",
              f"- repos scanned: {len(recs)} ({', '.join(f'{k}: {v}' for k, v in sorted(statuses.items()))})",
+             f"- llama.cpp could not load the vocabulary: {len(failed)} repos (listed below; usually an architecture "
+             "newer than the llama.cpp build)",
              f"- checked against their source tokenizer: {len(ok)}",
-             f"- llama.cpp disagrees with the source tokenizer: **{len(bad)}** repos, "
+             f"- llama.cpp tokenizes or decodes differently from the source tokenizer: **{len(bad)}** repos, "
              f"{sum(r['downloads'] for r in bad):,} downloads in the last 30 days",
              f"- source tokenizer differs from its base model's (drift): **{len(drifted)}** repos, "
              f"{sum(r['downloads'] for r in drifted):,} downloads", ""]
-    lines += ["## llama.cpp vs source tokenizer", "",
+
+    agg: dict = {}
+    for r in bad:
+        for c in causes_of[r["repo"]]:
+            a = agg.setdefault(c, {"repos": [], "downloads": 0})
+            a["repos"].append(r)
+            a["downloads"] += r["downloads"]
+    lines += ["## Causes", "",
+              "A repo is counted once for every cause among its findings.", "",
+              "| cause | repos | downloads (30 days) | what it is | largest repos |", "|---|---:|---:|---|---|"]
+    for c, a in sorted(agg.items(), key=lambda kv: -kv[1]["downloads"]):
+        top = ", ".join(x["repo"] for x in sorted(a["repos"], key=lambda x: -x["downloads"])[:3])
+        lines.append(f"| {c} | {len(a['repos'])} | {a['downloads']:,} | {CAUSES.get(c, c)} | {top} |")
+
+    lines += ["", "## llama.cpp vs source tokenizer", "",
               "| repo | downloads | arch | pre | cases | encode | decode | vs base | causes | examples |",
               "|---|---:|---|---|---:|---:|---:|---|---|---|"]
     for r in sorted(bad, key=lambda r: -r["downloads"]):
         e = r["engine"]
         vb = r.get("engine_vs_base")
         vb_s = "-" if not vb else (f"{vb.get('encode')}/{vb.get('decode')}" if "encode" in vb else "error")
-        causes = ", ".join(f"{k} {v}" for k, v in sorted((e.get("classes") or {}).items(), key=lambda kv: -kv[1]))
+        causes = ", ".join(f"{k} {v}" for k, v in sorted(causes_of[r["repo"]].items(), key=lambda kv: -kv[1]))
         lines.append(f"| {r['repo']} | {r['downloads']:,} | {r.get('arch')} | {r.get('pre')} | {e.get('cases')} | "
                      f"{e.get('encode')} | {e.get('decode')} | {vb_s} | {causes} | "
                      f"{'; '.join(_fmt_ex(x) for x in r.get('examples', [])[:3])} |")
@@ -423,6 +527,12 @@ def report(out: Path) -> str:
     lines += ["", "## By architecture and pre-tokenizer", "", "| arch | pre | repos | downloads |", "|---|---|---:|---:|"]
     for (a, p), g in sorted(groups.items(), key=lambda kv: -kv[1]["downloads"]):
         lines.append(f"| {a} | {p} | {g['repos']} | {g['downloads']:,} |")
+    if failed:
+        lines += ["", "## llama.cpp could not load the vocabulary", "",
+                  "| repo | downloads | arch | pre | error |", "|---|---:|---|---|---|"]
+        for r in sorted(failed, key=lambda r: -r["downloads"]):
+            err = (r.get("error") or (r.get("engine") or {}).get("error_sample") or "").replace("|", "/").replace("\n", " ")
+            lines.append(f"| {r['repo']} | {r['downloads']:,} | {r.get('arch')} | {r.get('pre')} | {err[:160]} |")
     lines += ["", "## Tokenizer drift: source repo vs its base model", "",
               "| GGUF repo | downloads | source | base | differs in | probes changed |", "|---|---:|---|---|---|---:|"]
     for r in sorted(drifted, key=lambda r: -r["downloads"]):

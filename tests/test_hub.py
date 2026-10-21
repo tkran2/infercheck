@@ -1,5 +1,6 @@
 """Offline tests for the GGUF header reader and the hub audit helpers (no network)."""
 
+import json
 import struct
 import tempfile
 import unittest
@@ -7,7 +8,7 @@ from pathlib import Path
 
 from infercheck.ggufhdr import ARR, STR, U32, GGUFFormatError, file_fetcher, read_header, write_vocab_only
 from infercheck import hub
-from infercheck.hub import _latest, classify, hf_repo_from_url
+from infercheck.hub import _latest, _llama_cleanup, cause_of, classify, hf_repo_from_url, report
 
 
 def _s(text: str) -> bytes:
@@ -94,6 +95,43 @@ class TestScanBookkeeping(unittest.TestCase):
                 self.assertFalse((Path(td) / "records.jsonl").exists())
         finally:
             LlamaCppTokenizer.BIN = old
+
+
+class TestCauses(unittest.TestCase):
+    def f(self, **kw):
+        from types import SimpleNamespace
+        base = dict(kind="encode", text="", minimal="", ref_decoded=None, got_decoded=None,
+                    min_ref_decoded=None, min_got_decoded=None, got_error=None, min_got_error=None)
+        base.update(kw)
+        return SimpleNamespace(**base)
+
+    def test_llama_cleanup(self):
+        self.assertEqual(_llama_cleanup("x != y , ok 's"), "x!= y, ok's")
+        self.assertEqual(_llama_cleanup(" !"), "!")
+
+    def test_cause_of(self):
+        self.assertEqual(cause_of(self.f(kind="decode", minimal=" !", min_ref_decoded=" !", min_got_decoded="!"), []),
+                         "decode-cleanup")
+        self.assertEqual(cause_of(self.f(minimal="\u2000<|im_start|>"), ["<|im_start|>"]), "nfc")
+        self.assertEqual(cause_of(self.f(minimal="<|end|> "), ["<|end|>"]), "special-token")
+        self.assertEqual(cause_of(self.f(kind="error", minimal="a"), []), "engine-error")
+
+    def test_report_separates_load_failures(self):
+        recs = [
+            {"repo": "a/ok", "downloads": 10, "status": "ok", "pre": "qwen2",
+             "engine": {"cases": 100, "encode": 3, "decode": 0, "error": 0, "classes": {"nfc": 3}, "causes": {"nfc": 3}}},
+            {"repo": "b/load", "downloads": 20, "status": "ok", "pre": "qwen35",
+             "engine": {"cases": 100, "encode": 0, "decode": 0, "error": 100, "classes": {}}},
+            {"repo": "c/clean", "downloads": 5, "status": "ok", "pre": "gpt-4o",
+             "engine": {"cases": 100, "encode": 0, "decode": 0, "error": 0, "classes": {}, "causes": {}}},
+        ]
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / "records.jsonl").write_text("".join(json.dumps(r) + "\n" for r in recs), encoding="utf-8")
+            text = report(Path(td))
+        self.assertIn("could not load the vocabulary: 1 repos", text)
+        self.assertIn("differently from the source tokenizer: **1** repos, 10 downloads", text)
+        self.assertIn("| nfc | 1 | 10 |", text)
+        self.assertIn("| b/load | 20 |", text)
 
 
 if __name__ == "__main__":
