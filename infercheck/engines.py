@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,7 +77,11 @@ class HFTokenizer(Engine):
 
 
 def _run(cmd: list[str], payload: str, timeout: float) -> tuple[str, str, int]:
-    proc = subprocess.run(cmd, input=payload.encode("utf-8", "surrogatepass"), capture_output=True, timeout=timeout)
+    # GGML_NO_BACKTRACE: on an abort ggml would otherwise attach gdb for a backtrace, which is slow and can
+    # write to stdout
+    env = {**os.environ, "GGML_NO_BACKTRACE": "1"}
+    proc = subprocess.run(cmd, input=payload.encode("utf-8", "surrogatepass"), capture_output=True, timeout=timeout,
+                          env=env)
     return proc.stdout.decode("utf-8", "replace"), proc.stderr.decode("utf-8", "replace"), proc.returncode
 
 
@@ -118,19 +123,71 @@ OllamaTokenizer.decode_ids = _ollama_decode_ids
 class LlamaCppTokenizer(Engine):
     BIN = Path(os.environ.get("INFERCHECK_LLAMATOK", ROOT / "harness" / "llama_tok" / "llamatok"))
 
-    def __init__(self, gguf: str):
+    def __init__(self, gguf: str, bin_path: str | Path | None = None):
         super().__init__("llama.cpp", gguf)
+        if bin_path is not None:  # a harness built against another llama.cpp commit (bench)
+            self.BIN = Path(bin_path)
+
+    def info(self, timeout: float = 120) -> dict:
+        """Special-token behavior of the vocabulary: harness --info (see llamatok.cpp)."""
+        out, err, code = _run([str(self.BIN), self.path, "--info"], "", timeout)
+        if code != 0:
+            hint = " (the harness predates --info: rebuild it)" if "usage:" in err else ""
+            raise RuntimeError(f"llamatok --info failed with exit {code}{hint}: {err.strip()[:300]}")
+        try:
+            return json.loads(out.strip().split("\n")[0])
+        except (ValueError, IndexError) as exc:
+            raise RuntimeError(f"llamatok --info printed no JSON: {out[:200]!r}") from exc
+
+    MAX_RESTARTS = 1000
+    last_crashes = 0
+
+    LINE = {"": re.compile(r"^[0-9 ]*\t(?:[0-9a-f]*|ERROR)$"), "--decode": re.compile(r"^(?:[0-9a-f]*|ERROR)$")}
+
+    def _batch(self, args: list[str], lines_in: list[str], timeout: float) -> tuple[list[str | None], list[str]]:
+        """Feed lines to the harness and collect one output line per input. If the harness crashes (an abort or
+        a segfault on one input), the input it died on gets None, the harness restarts after it, and the error
+        is kept; the harness flushes every line, so nothing before the crash is lost. A failure to load the
+        model (exit 3) or too many crashes marks the remaining inputs None."""
+        out_lines: list[str | None] = []
+        errors: list[str] = []
+        start = 0
+        self.last_crashes = 0
+        silent = 0  # consecutive crashes with no output at all: the harness cannot start
+        while start < len(lines_in):
+            chunk = lines_in[start:]
+            out, err, code = _run([str(self.BIN), self.path, *args], "".join(x + "\n" for x in chunk), timeout)
+            done = out.split("\n")[:-1][:len(chunk)]  # complete lines only
+            if code != 0:  # keep only well-formed result lines from before the crash
+                pat = self.LINE["--decode" if "--decode" in args else ""]
+                n = next((i for i, x in enumerate(done) if not pat.match(x)), len(done))
+                done = done[:n]
+            out_lines += done
+            if code == 0:
+                if len(done) != len(chunk):
+                    raise RuntimeError(f"llamatok returned {len(done)} rows for {len(chunk)} inputs: {err[:300]}")
+                break
+            msg = f"exit {code}: {err.strip()[:300]}"
+            errors.append(msg)
+            silent = silent + 1 if not done else 0
+            if code == 3 or silent >= 3 or self.last_crashes >= self.MAX_RESTARTS:
+                out_lines += [None] * (len(chunk) - len(done))
+                break
+            self.last_crashes += 1
+            out_lines.append(None)  # the input it died on
+            start += len(done) + 1
+        return out_lines, errors
 
     def encode_many(self, texts: list[str], timeout: float = 600) -> list[Result]:
-        payload = "".join(t.encode("utf-8", "surrogatepass").hex() + "\n" for t in texts)
-        out, err, code = _run([str(self.BIN), self.path], payload, timeout)
-        if code != 0:
-            return [Result(None, None, f"exit {code}: {err.strip()[:300]}") for _ in texts]
-        lines = out.split("\n")[:len(texts)]
-        if len(lines) != len(texts):
-            raise RuntimeError(f"llamatok returned {len(lines)} rows for {len(texts)} inputs: {err[:300]}")
+        lines, errors = self._batch([], [t.encode("utf-8", "surrogatepass").hex() for t in texts], timeout)
         res = []
+        e = iter(errors)
+        last = None
         for line in lines:
+            if line is None:
+                last = next(e, last)
+                res.append(Result(None, None, last or "harness failed"))
+                continue
             ids_s, _, dec = line.partition("\t")
             if dec == "ERROR":
                 res.append(Result(None, None, "llama_tokenize failed"))
@@ -141,12 +198,9 @@ class LlamaCppTokenizer(Engine):
 
 
 def _llama_decode_ids(self, seqs: list[list[int]], timeout: float = 600) -> list[str | None]:
-    payload = "".join(" ".join(map(str, ids)) + "\n" for ids in seqs)
-    out, err, code = _run([str(self.BIN), self.path, "--decode"], payload, timeout)
-    if code != 0:
-        return [None] * len(seqs)
-    lines = out.split("\n")[:len(seqs)]
-    return [None if line == "ERROR" else bytes.fromhex(line).decode("utf-8", "replace") for line in lines]
+    """Decode each id sequence; None where the harness failed or crashed (self.last_crashes counts crashes)."""
+    lines, _ = self._batch(["--decode"], [" ".join(map(str, ids)) for ids in seqs], timeout)
+    return [None if line is None or line == "ERROR" else bytes.fromhex(line).decode("utf-8", "replace") for line in lines]
 
 
 LlamaCppTokenizer.decode_ids = _llama_decode_ids

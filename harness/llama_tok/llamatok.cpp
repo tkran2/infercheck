@@ -1,8 +1,12 @@
 // llamatok: batch tokenizer over libllama, for differential testing.
 //
-// Usage: llamatok MODEL.gguf [--decode] < cases > results
+// Usage: llamatok MODEL.gguf [--decode | --info] < cases > results
 // With --decode, each input line is space-separated token ids and the output is the hex of
 // llama_detokenize(ids, remove_special=false, unparse_special=true).
+// With --info, no input is read; one JSON line describes the vocabulary's special-token
+// behavior: add_bos/add_eos, the bos/eos/eot ids, every end-of-generation (EOG) token with
+// its text and attribute bits, and the token ids of PROBE tokenized with and without
+// add_special, which shows exactly what llama_tokenize puts around a prompt.
 // Input: one case per line, the UTF-8 text hex-encoded (so any byte, newline or NUL survives).
 // Output: one line per case: space-separated token ids, a tab, and the hex of
 // llama_detokenize(ids). Tokenization uses add_special=false, parse_special=true, which
@@ -32,12 +36,85 @@ static void quiet_log(enum ggml_log_level level, const char * text, void *) {
     }
 }
 
+static std::string json_str(const std::string & s) {
+    std::string out = "\"";
+    for (unsigned char c : s) {
+        switch (c) {
+            case '"':  out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n";  break;
+            case '\r': out += "\\r";  break;
+            case '\t': out += "\\t";  break;
+            default:
+                if (c < 0x20) {
+                    char buf[8];
+                    snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    out += buf;
+                } else {
+                    out.push_back((char) c);  // UTF-8 passes through; invalid bytes are fixed up by the reader
+                }
+        }
+    }
+    return out + "\"";
+}
+
+static std::string json_ids(const std::vector<llama_token> & ids) {
+    std::string out = "[";
+    for (size_t i = 0; i < ids.size(); i++) {
+        if (i) out += ",";
+        out += std::to_string(ids[i]);
+    }
+    return out + "]";
+}
+
+static std::vector<llama_token> tokenize(const llama_vocab * vocab, const std::string & text, bool add_special) {
+    std::vector<llama_token> toks(text.size() + 16);
+    int32_t n = llama_tokenize(vocab, text.data(), (int32_t) text.size(), toks.data(), (int32_t) toks.size(), add_special, true);
+    if (n < 0) {
+        toks.resize(-n);
+        n = llama_tokenize(vocab, text.data(), (int32_t) text.size(), toks.data(), (int32_t) toks.size(), add_special, true);
+    }
+    toks.resize(n < 0 ? 0 : n);
+    return toks;
+}
+
+static const char * PROBE = "Hello world";
+
+static int print_info(const llama_model * model, const llama_vocab * vocab) {
+    const int32_t n = llama_vocab_n_tokens(vocab);
+    std::string eog = "[";
+    bool first = true;
+    for (llama_token t = 0; t < n; t++) {
+        if (!llama_vocab_is_eog(vocab, t)) continue;
+        if (!first) eog += ",";
+        first = false;
+        eog += "{\"id\":" + std::to_string(t) + ",\"text\":" + json_str(llama_vocab_get_text(vocab, t)) +
+               ",\"attr\":" + std::to_string((int) llama_vocab_get_attr(vocab, t)) + "}";
+    }
+    eog += "]";
+    const char * tmpl = llama_model_chat_template(model, nullptr);
+    std::cout << "{\"n_tokens\":" << n
+              << ",\"add_bos\":" << (llama_vocab_get_add_bos(vocab) ? "true" : "false")
+              << ",\"add_eos\":" << (llama_vocab_get_add_eos(vocab) ? "true" : "false")
+              << ",\"bos\":" << llama_vocab_bos(vocab)
+              << ",\"eos\":" << llama_vocab_eos(vocab)
+              << ",\"eot\":" << llama_vocab_eot(vocab)
+              << ",\"eog\":" << eog
+              << ",\"probe\":" << json_str(PROBE)
+              << ",\"probe_plain\":" << json_ids(tokenize(vocab, PROBE, false))
+              << ",\"probe_special\":" << json_ids(tokenize(vocab, PROBE, true))
+              << ",\"chat_template\":" << (tmpl ? json_str(tmpl) : std::string("null"))
+              << "}" << std::endl;
+    return 0;
+}
+
 int main(int argc, char ** argv) {
-    if (argc < 2 || argc > 3 || (argc == 3 && std::string(argv[2]) != "--decode")) {
-        fprintf(stderr, "usage: %s MODEL.gguf [--decode] < lines\n", argv[0]);
+    const std::string mode = argc == 3 ? argv[2] : "";
+    if (argc < 2 || argc > 3 || (argc == 3 && mode != "--decode" && mode != "--info")) {
+        fprintf(stderr, "usage: %s MODEL.gguf [--decode | --info] < lines\n", argv[0]);
         return 2;
     }
-    const bool decode_only = argc == 3;
+    const bool decode_only = mode == "--decode";
     llama_log_set(quiet_log, nullptr);
     llama_backend_init();
     llama_model_params mp = llama_model_default_params();
@@ -49,6 +126,12 @@ int main(int argc, char ** argv) {
         return 3;
     }
     const llama_vocab * vocab = llama_model_get_vocab(model);
+    if (mode == "--info") {
+        const int rc = print_info(model, vocab);
+        llama_model_free(model);
+        llama_backend_free();
+        return rc;
+    }
     std::string line;
     std::vector<llama_token> toks;
     std::vector<char> buf;

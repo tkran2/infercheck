@@ -65,7 +65,64 @@ python -m infercheck.cli hub-report results/hub                   # writes resul
 
 The report lists every repo where llama.cpp disagrees with the source tokenizer (sorted by downloads, with a rough cause for each finding: combining marks, NFC, digits, whitespace, CRLF, special tokens), grouped by architecture and pre-tokenizer, plus every repo whose source tokenizer differs from its base model. Gated base models need `hf auth login` with access granted.
 
+Besides the tokenizer comparison, every repo also gets three checks that read the same metadata:
+
+- **refdecode**: llama.cpp decodes the source tokenizer's token ids. This reaches ids llama.cpp's own tokenizer never produces (byte-fallback tokens), where a decode bug or crash otherwise stays hidden.
+- **start and stop tokens** (`infercheck/special.py`): the tokens llama.cpp adds around a prompt (BOS, EOS) against the source tokenizer (transformers' `AutoTokenizer` when installed, otherwise the `tokenizers` post-processor), and the tokens that end generation against `generation_config.json`. A missing stop token lets the model run past its answer; an ordinary text token treated as a stop token cuts answers off. A BOS that llama.cpp adds to plain text but the source tokenizer adds only through its chat template is reported as info, not a bug: llama.cpp drops the template's BOS and adds its own, so chat prompts agree (Gemma 4).
+- **long inputs**: tens of thousands of repeated characters, where regex backtracking can overflow the stack.
+
+They need the harness's `--info` mode, so rebuild `llamatok` after updating.
+
 `hub-scan` needs the llama.cpp harness (`harness/llama_tok/llamatok`, built as under Reproduce) and stops before scanning if it is missing or does not run. Re-running a scan into the same folder skips finished repos and retries the ones that failed. On macOS, if linking fails with `tapi error: malformed file ... unknown architecture`, the default SDK is newer than the linker; add `-isysroot` with the SDK CMake used for llama.cpp (printed as `BLAS found, Libraries: .../SDKs/MacOSX<version>.sdk/...`).
+
+## Bug benchmark: would InferCheck have caught past bugs?
+
+`bench/cases.json` is a catalog of real bugs from llama.cpp's history and from published GGUF files (2024 to 2026), each with its sources, plus controls: popular GGUFs with no known bug. `bench run` replays every case on the version with the bug and the version with the fix:
+
+- **bugs in llama.cpp**: the same GGUF through llama.cpp built at the commit before the fix and at the fix. `scripts/build_llama_at.sh` builds any commit (CPU only, a few minutes, cached).
+- **bugs in GGUF files**: the file as uploaded before the fix and after it. The Hub keeps every revision, and only the metadata is read.
+
+The two versions are compared string by string: a check catches a bug when strings it flags with the bug pass with the fix, so whatever both versions share cancels out, and a fix that repairs one thing while breaking another still counts (the report lists the new problems). A control that gets flagged is either a false alarm or a bug nobody has reported.
+
+A few things keep the score honest:
+
+- A file case names the metadata key the bug lives in (`file.bug_header`). If the file before the fix does not show it, or the file after still does, the case is inconclusive, not missed: the Hub revisions picked are not the ones the bug report was about.
+- Cases that reproduce on one platform only (`"platform": "linux"` for the `std::regex` stack overflows, which Apple's libc++ does not have) are reported as not run elsewhere.
+- With `transformers` installed, the tokens around a prompt are compared against what `AutoTokenizer` adds, which is what users of the original model get; without it, against the `tokenizers` post-processor, which misses tokenizer classes that add BOS themselves. The report header says which was used.
+- A GGUF whose architecture the llama.cpp build does not know (a fork's file, or a model newer than the build) is skipped for the next candidate repo.
+- Two cases were rescored after the first runs, and their notes say why: the Gemma 4 BOS fix and the GLM-4-0414 converter fix turned out not to change anything a comparison with the original tokenizer can see (transformers adds no BOS to plain Gemma 4 text either; both GLM files stop on the same tokens), so they are listed as not covered rather than missed.
+
+```sh
+python -m infercheck.cli bench list
+python -m infercheck.cli bench run --llama-src ../llama.cpp --out results/bench    # resumable; writes report.md
+python -m infercheck.cli bench run --only gemma4-byte-token-decode --llama-src ../llama.cpp --out results/bench
+```
+
+| check | what it compares |
+|---|---|
+| encode | token ids, against the source tokenizer |
+| decode | decoded text, when the ids agree |
+| refdecode | llama.cpp decoding the source tokenizer's ids |
+| wrap | tokens added around a prompt (BOS/EOS) |
+| stop | end-of-generation tokens |
+| stress | long inputs |
+
+Chat templates and model metadata that only change the logits are not checked yet; the catalog includes such cases, marked as not covered.
+
+`scripts/bench_offline.py` replays llama.cpp bugs with no network at all, against the reference tokenizations llama.cpp keeps next to its test vocabularies (`models/ggml-vocab-*.gguf.inp/.out`).
+
+Offline replays of the Gemma 4 launch fixes (April 2026) on llama.cpp's Gemma 4 test vocabulary, each fix's parent commit against the fix. "Reference" is llama.cpp's 46 Hugging Face tokenizations; "corpus" is InferCheck's corpus run through both builds.
+
+| case | what showed the bug | what the old InferCheck checks saw |
+|---|---|---|
+| gemma4-loaded-as-spm | reference: `" discards"` wrong before the fix; the fix itself dropped 🦙 and crashed on a newline run (both fixed within days). Corpus: 906 probe and 49 vocabulary-word strings differ | the 49 word-level differences come from the new vocabulary-word strings |
+| gemma4-newline-split | stress: segfault on 6 of 10 long inputs before the fix, none after | nothing: no other string differs |
+| gemma4-byte-token-decode | refdecode: 🦙's byte tokens decode to nothing before the fix (`" this is 🦙.cpp"` → `" this is.cpp"`) | nothing: llama.cpp's own encoder dropped 🦙 then, so a round trip never produced the tokens |
+| gemma4-byte-fallback-encode | encode: before the fix every character without its own token vanished from the prompt, carriage returns included (`"a\rb"` → `"ab"`): 871 corpus strings and 🦙 in the reference | caught (encode) |
+| gemma4-stop-tokens | stop: before the fix `</s>` (id 212, an ordinary text token in Gemma 4's vocabulary) ends generation | nothing: no string tokenizes differently |
+| clean-spaces-decode | decode: before the fix the space before `!`, `?` and `'s` is dropped (`" !"` → `"!"`): 24 corpus strings and 2 reference strings | caught (decode) |
+
+All six fixes show up. Three of them (a crash on long prompts, emoji vanishing from output, an ordinary word ending generation) are visible only to the checks added with the benchmark.
 
 ## Reproduce
 
@@ -96,15 +153,17 @@ To compare two builds of llama.cpp, set `LD_LIBRARY_PATH` (Linux) or `DYLD_LIBRA
 ## Limits
 
 - **The reference is the model's `tokenizer.json`.** Where the original tokenizer is SentencePiece, the fast Hugging Face tokenizer can itself differ from it. For example, Mistral-7B's `" "` gives `▁` in Hugging Face and `▁▁` in sentencepiece. Those cases are reported, but not counted as engine bugs.
-- **Only tokenization is tested.** Chat templates, sampling and model outputs are not.
+- **Tokenization, start/stop tokens and decoding are tested.** Chat templates, sampling and model outputs are not.
 - **Unicode versions.** Engines and the reference can disagree on code points assigned after an engine's Unicode tables were generated.
 
 ## Layout
 
 ```
-infercheck/   corpus, engines, diff + ddmin, CLI, hub audit (hub.py, ggufhdr.py)
+infercheck/   corpus, engines, diff + ddmin, CLI, hub audit (hub.py, ggufhdr.py), start/stop tokens (special.py),
+              bug benchmark (bench.py)
+bench/        cases.json: the catalog of known bugs
 harness/      llama_tok (C++ over libllama), ollama_tok (Go, vendored Ollama tokenizer, MIT)
-scripts/      data fetch, GGUF conversion, digest of results
+scripts/      data fetch, GGUF conversion, digest of results, build_llama_at.sh, bench_offline.py
 results/      run summaries, shrunk findings, before/after tables
 tests/        unit tests (corpus, shrinking, CLI, both harnesses)
 ```

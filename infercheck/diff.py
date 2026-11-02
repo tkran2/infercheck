@@ -13,6 +13,7 @@ Findings with the same shrunk string are one finding.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import threading
@@ -142,16 +143,28 @@ class Finding:
         return json.dumps(asdict(self), ensure_ascii=False)
 
 
+def text_key(text: str) -> str:
+    """A short stable key for a test string, to compare which strings disagree across two runs."""
+    return hashlib.sha1(text.encode("utf-8", "surrogatepass")).hexdigest()[:12]
+
+
 def compare(ref: HFTokenizer, engines: list[Engine], cases, shrink: bool = True, max_shrink: int = 200,
-            log=print) -> tuple[list[Finding], dict]:
+            log=print, record_keys: bool = False) -> tuple[list[Finding], dict]:
+    """With record_keys, stats also lists the key of every compared string ("corpus") and of every string
+    that disagrees, per kind (engines[name]["bad"]), so two runs can be compared string by string."""
     texts = [c.text for c in cases]
     ref_res = ref.encode_many(texts)
     findings: list[Finding] = []
     stats = {"cases": len(cases), "reference_errors": sum(r.error is not None for r in ref_res), "engines": {}}
+    if record_keys:
+        stats["corpus"] = sorted({text_key(t) for t, r in zip(texts, ref_res) if r.error is None})
     for eng in engines:
         got_res = eng.encode_many(texts)
         kinds = [kind_of(r, g) for r, g in zip(ref_res, got_res)]
         counts = {k: kinds.count(k) for k in ("encode", "decode", "error")}
+        if record_keys:
+            counts["bad"] = {k: sorted({text_key(t) for t, kk in zip(texts, kinds) if kk == k})
+                             for k in ("encode", "decode", "error")}
         stats["engines"][eng.name] = counts
         log(f"  {eng.name}: {counts['encode']} encode, {counts['decode']} decode, {counts['error']} error disagreements "
             f"in {len(cases)} cases")

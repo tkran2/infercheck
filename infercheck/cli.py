@@ -6,6 +6,9 @@
   infercheck compare BEFORE AFTER               per-tokenizer disagreement counts of two tok runs (Markdown)
   infercheck hub-scan --top 500 --out DIR       audit the most-downloaded GGUF repos on Hugging Face
   infercheck hub-report DIR                     Markdown report of a hub-scan
+  infercheck bench list                         the catalog of known bugs (bench/cases.json)
+  infercheck bench run --llama-src ~/Projects/llama.cpp --out DIR   replay them; how many does InferCheck catch?
+  infercheck bench report DIR                   Markdown report of a bench run
 
 DIR is the unpacked data/ folder from scripts/mac_fetch.sh: tokenizers/<name>/tokenizer.json,
 tokenizers/ggml-vocabs/**.gguf and ollama-gguf/*.gguf.
@@ -218,7 +221,34 @@ def main(argv=None) -> int:
     p.add_argument("--max-shrink", type=int, default=15)
     p = sub.add_parser("hub-report", help="Markdown report of a hub-scan output folder")
     p.add_argument("out", nargs="?", default="results/hub")
+    p = sub.add_parser("bench", help="replay known llama.cpp and GGUF bugs and measure what InferCheck catches")
+    p.add_argument("action", choices=["list", "run", "report"])
+    p.add_argument("out", nargs="?", default="results/bench", help="output folder (run, report)")
+    p.add_argument("--out", dest="out_opt", help="output folder (same as the positional one)")
+    p.add_argument("--cases", default=None, help="case file (default bench/cases.json)")
+    p.add_argument("--only", nargs="*", help="run only these case ids")
+    p.add_argument("--llama-src", help="a llama.cpp git clone, used to build the commits the cases pin")
+    p.add_argument("--n", type=int, default=300, help="generated cases per side (plus ~2,000 fixed probes)")
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--max-shrink", type=int, default=15)
     args = ap.parse_args(argv)
+    if args.cmd == "bench":
+        from . import bench
+        cases = Path(args.cases) if args.cases else bench.CASES
+        out = Path(args.out_opt or args.out)
+        if args.action == "list":
+            print(bench.list_cases(cases), end="")
+            return 0
+        if args.action == "report":
+            if not (out / "sides.jsonl").exists():
+                print(f"no bench results in {out} (run `infercheck bench run` first)", file=sys.stderr)
+                return 2
+            text = bench.report(out, cases)
+            (out / "report.md").write_text(text, encoding="utf-8")
+            print(text, end="")
+            return 0
+        src = Path(args.llama_src).expanduser() if args.llama_src else None
+        return bench.run(cases, out, src, args.only, args.n, args.seed, args.max_shrink)
     if args.cmd == "hub-scan":
         from .hub import scan
         return scan(args.top, Path(args.out), args.n, args.seed, args.repos, args.max_shrink)

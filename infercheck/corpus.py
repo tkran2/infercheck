@@ -109,6 +109,35 @@ def fixed_cases() -> list[Case]:
     return cases
 
 
+def word_cases(pieces: list[str], n: int = 400, seed: int = 0) -> list[Case]:
+    """Ordinary text built from the tokenizer's own vocabulary: 2-6 random vocabulary pieces glued together
+    (" discard" + "s" + " the"). The character pools above rarely form real words, and merge-order bugs
+    (a merge applied in the wrong order turns " discards" into different tokens) only show on words.
+    ``pieces`` are single token ids decoded to text by the reference."""
+    rng = random.Random(seed)
+    words = sorted({p for p in pieces if p.strip() and "�" not in p and len(p) <= 24
+                    and not (p.startswith("<") and p.endswith(">")) and not (p.startswith("[") and p.endswith("]"))})
+    if not words:
+        return []
+    return [Case(f"w{seed}-{i}", "".join(rng.choice(words) for _ in range(rng.randint(2, 6))), "word") for i in range(n)]
+
+
+def vocab_pieces(decode_one, vocab_size: int, k: int = 4000, seed: int = 0) -> list[str]:
+    """Up to k vocabulary entries, sampled with a fixed seed and decoded one id at a time."""
+    rng = random.Random(seed)
+    ids = sorted(rng.sample(range(vocab_size), min(k, vocab_size)))
+    return [p for p in decode_one(ids) if p is not None]
+
+
+def stress_cases() -> list[Case]:
+    """Long inputs. A regex engine that backtracks recursively overflows the stack on tens of thousands
+    of repeated characters (llama.cpp's std::regex fallback did, ggml-org/llama.cpp#21113), and buffer
+    sizing bugs show up on long outputs. Too long to shrink, so they are run without shrinking."""
+    out = ["A" * 50000, "a" * 50000, " " * 50000, "1" * 50000, "!" * 50000, "\n" * 20000,
+           "é" * 20000, "中" * 20000, "ab " * 15000, "\U0001f600" * 10000]
+    return [Case(f"x{i}", s, "stress") for i, s in enumerate(out)]
+
+
 def special_cases(special: list[str]) -> list[Case]:
     """Added-token strings in the positions where matching rules differ."""
     out: list[str] = []

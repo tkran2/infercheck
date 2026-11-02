@@ -99,8 +99,8 @@ def card_base_models(info: dict) -> list[str]:
     return [b for b in (bm or []) if isinstance(b, str) and "/" in b]
 
 
-def pick_gguf(repo: str) -> str | None:
-    tree, _ = api(f"models/{repo}/tree/main", {"recursive": "true"})
+def pick_gguf(repo: str, revision: str = "main") -> str | None:
+    tree, _ = api(f"models/{repo}/tree/{revision}", {"recursive": "true"})
     files = [f["path"] for f in tree or [] if f.get("type") == "file" and f["path"].endswith(".gguf")
              and not SKIP_FILE.search(f["path"])]
     if not files:
@@ -115,10 +115,10 @@ def pick_gguf(repo: str) -> str | None:
     return (singles or first_split or files)[0]
 
 
-def range_fetcher(repo: str, path: str):
+def range_fetcher(repo: str, path: str, revision: str | None = None):
     from huggingface_hub import hf_hub_url
 
-    url = hf_hub_url(repo, path)
+    url = hf_hub_url(repo, path, revision=revision)
 
     def fetch(offset: int, size: int) -> bytes:
         for attempt in range(3):
@@ -144,18 +144,23 @@ def range_fetcher(repo: str, path: str):
     return fetch
 
 
-def fetch_tokenizer(repo: str, cache: Path) -> Path | None:
-    """tokenizer.json (+ tokenizer_config.json if present) of a repo, or None if unavailable."""
+def fetch_tokenizer(repo: str, cache: Path, revision: str | None = None) -> Path | None:
+    """tokenizer.json (+ tokenizer_config.json and generation_config.json if present) of a repo, or None
+    if unavailable. The files land in one snapshot folder, so the others sit next to tokenizer.json."""
     from huggingface_hub import hf_hub_download
 
     try:
-        tj = Path(hf_hub_download(repo, "tokenizer.json", cache_dir=str(cache)))
+        tj = Path(hf_hub_download(repo, "tokenizer.json", cache_dir=str(cache), revision=revision))
     except Exception:
         return None
-    try:
-        hf_hub_download(repo, "tokenizer_config.json", cache_dir=str(cache))
-    except Exception:
-        pass
+    # special_tokens_map.json and config.json let transformers' AutoTokenizer load the folder; chat_template.jinja
+    # (newer repos keep the template out of tokenizer_config.json) says whether chat prompts start with BOS (special.py)
+    for name in ("tokenizer_config.json", "generation_config.json", "special_tokens_map.json", "config.json",
+                 "chat_template.jinja"):
+        try:
+            hf_hub_download(repo, name, cache_dir=str(cache), revision=revision)
+        except Exception:
+            pass
     return tj
 
 
@@ -219,6 +224,8 @@ CAUSES = {
     "decode-cleanup": "llama.cpp's detokenizer removes the space before . , ! ? and 's 'm 're 've "
                       "(clean_up_tokenization_spaces) although the source tokenizer leaves it off",
     "special-token": "text next to added or special tokens (lstrip/rstrip and normalization flags)",
+    "control-text": "text llama.cpp parses as an end-of-generation control token although the source tokenizer treats "
+                    "it as ordinary text (Qwen's </s> since llama.cpp #18825)",
     "crlf": "carriage returns",
     "digits": "digit grouping",
     "combining-mark": "combining marks",
@@ -268,18 +275,108 @@ def drift(source_tj: Path, base_tj: Path) -> dict | None:
             "source_class": a["tokenizer_class"], "base_class": b["tokenizer_class"]}
 
 
-def run_engine_check(vocab_gguf: Path, ref_tj: Path, n_gen: int, seed: int, max_shrink: int) -> tuple[dict, list]:
+def refdecode_check(ref, eng, texts: list[str], examples: int = 5, keys: bool = False) -> dict:
+    """Decode the reference's token ids with the engine and compare with the reference's decoding.
+    This reaches token ids the engine's own tokenizer never produces (byte-fallback tokens, for
+    instance), so it catches detokenizer bugs and crashes that encode-and-decode round trips miss.
+    With keys, also list the keys of the strings compared and of those that differ (see diff.text_key)."""
+    from .diff import text_key
+
+    ref_res = ref.encode_many(texts)
+    pairs = [(t, r) for t, r in zip(texts, ref_res) if r.error is None and r.ids]
+    if not pairs:
+        return {"compared": 0, "mismatch": 0, "error": 0}
+    got = eng.decode_ids([r.ids for _, r in pairs])
+    out = {"compared": len(pairs), "mismatch": 0, "error": 0, "examples": []}
+    if getattr(eng, "last_crashes", 0) or (got and all(g is None for g in got)):
+        out["crash"] = True  # the harness aborted or segfaulted while decoding some of these
+    bad = set()
+    for (t, r), g in zip(pairs, got):
+        if g is None:
+            out["error"] += 1
+            bad.add(text_key(t))
+        elif g != r.decoded:
+            out["mismatch"] += 1
+            bad.add(text_key(t))
+            if len(out["examples"]) < examples:
+                out["examples"].append({"text": t[:80], "ids": r.ids[:16], "ref": r.decoded[:80], "got": g[:80]})
+    if keys:
+        out["corpus"] = sorted({text_key(t) for t, _ in pairs})
+        out["bad"] = sorted(bad)
+    return out
+
+
+def stress_check(ref, eng) -> dict:
+    """Long inputs (tens of thousands of repeated characters), where regex backtracking overflows the stack."""
+    from .corpus import stress_cases
+    from .diff import kind_of
+
+    cases = stress_cases()
+    texts = [c.text for c in cases]
+    ref_res = ref.encode_many(texts)
+    got = eng.encode_many(texts)
+    if all(g.error for g in got):  # one input took the batch down: rerun them one by one to see which
+        got = [eng.encode_many([t])[0] for t in texts]
+    kinds = [kind_of(r, g) for r, g in zip(ref_res, got)]
+    bad = [{"case": c.id, "kind": k, "error": (g.error or "")[:120]} for c, g, k in zip(cases, got, kinds) if k]
+    return {"cases": len(cases), "mismatch": sum(k in ("encode", "decode") for k in kinds),
+            "error": kinds.count("error"), "failures": bad,
+            "corpus": [c.id for c, r in zip(cases, ref_res) if r.error is None]}
+
+
+def special_check(eng, ref_tj: Path) -> dict:
+    """Start/stop-token comparison (see special.py)."""
+    from .special import compare_special, reference_special
+
+    try:
+        info = eng.info()
+    except Exception as exc:
+        return {"error": str(exc)[:300]}
+    try:
+        ref = reference_special(ref_tj)
+    except Exception as exc:
+        return {"error": f"reference: {exc}"[:300]}
+    issues = compare_special(ref, info)
+    return {"issues": issues, "add_bos": info.get("add_bos"), "add_eos": info.get("add_eos"), "ref_impl": ref.get("impl"),
+            "eog": [e["id"] for e in info.get("eog", [])], "ref_stops": sorted(int(k) for k in ref["stops"])}
+
+
+def run_engine_check(vocab_gguf: Path, ref_tj: Path, n_gen: int, seed: int, max_shrink: int,
+                     bin_path: Path | None = None, extra: bool = True, keys: bool = False) -> tuple[dict, list]:
+    """Encode/decode differential test of llama.cpp (the harness at bin_path, or the default build)
+    against the reference tokenizer. With extra, also run refdecode, stress and special checks; their
+    results are under the "refdecode", "stress" and "special" keys. With keys, record which strings
+    disagree (for comparing two runs string by string; bench uses this, hub-scan does not)."""
     from .cli import added_tokens
     from .corpus import fixed_cases, generated_cases, special_cases
     from .diff import compare
     from .engines import HFTokenizer, LlamaCppTokenizer
 
     ref = HFTokenizer(str(ref_tj))
-    eng = LlamaCppTokenizer(str(vocab_gguf))
+    eng = LlamaCppTokenizer(str(vocab_gguf), bin_path=bin_path)
     eng.name = "llama.cpp"
     special = added_tokens(ref_tj)[:300]
+    engine_only: list[str] = []
+    if extra:
+        # also the text of every token llama.cpp treats as end-of-generation: llama.cpp parses those as control
+        # tokens in prompts, so one that is ordinary text in the reference (Qwen's "</s>") tokenizes differently
+        try:
+            engine_only = [e["text"] for e in eng.info().get("eog", [])
+                           if e.get("text") and e["text"] not in special and len(e["text"]) > 1]
+            special += engine_only
+        except Exception:
+            pass  # a harness without --info: the corpus is as before
     cases = fixed_cases() + special_cases(special) + generated_cases(n_gen, seed, special)
-    findings, stats = compare(ref, [eng], cases, shrink=max_shrink > 0, max_shrink=max_shrink, log=lambda *a, **k: None)
+    if extra:
+        from .corpus import vocab_pieces, word_cases
+        try:
+            size = ref.tok.get_vocab_size(with_added_tokens=False)
+            pieces = vocab_pieces(lambda ids: [ref.tok.decode([i], skip_special_tokens=True) for i in ids], size, seed=seed)
+            cases += word_cases(pieces, seed=seed)
+        except Exception:
+            pass
+    findings, stats = compare(ref, [eng], cases, shrink=max_shrink > 0, max_shrink=max_shrink, log=lambda *a, **k: None,
+                              record_keys=keys)
     s = stats["engines"].get("llama.cpp", {})
     classes: dict = {}
     causes: dict = {}
@@ -287,12 +384,39 @@ def run_engine_check(vocab_gguf: Path, ref_tj: Path, n_gen: int, seed: int, max_
         c = classify(f.minimal, special)
         classes[c] = classes.get(c, 0) + 1
         f.cls = cause_of(f, special)
+        if f.cls == "special-token" and any(t in (f.minimal or f.text) for t in engine_only):
+            f.cls = "control-text"
         causes[f.cls] = causes.get(f.cls, 0) + 1
     result = {"cases": stats["cases"], **s, "reference_errors": stats["reference_errors"], "classes": classes, "causes": causes}
+    if keys:
+        result["corpus"] = stats.get("corpus", [])
     err = next((f.got_error or f.min_got_error for f in findings if f.kind == "error" and (f.got_error or f.min_got_error)), None)
     if err:
         result["error_sample"] = err[:300]
+    if extra and not (_load_failed({"engine": result}) and (result.get("error_sample") or "").startswith("exit 3")):
+        for key, fn in (("refdecode", lambda: refdecode_check(ref, eng, [c.text for c in cases], keys=keys)),
+                        ("stress", lambda: stress_check(ref, eng)),
+                        ("special", lambda: special_check(eng, ref_tj))):
+            try:
+                result[key] = fn()
+            except Exception as exc:
+                result[key] = {"error": f"{type(exc).__name__}: {exc}"[:300]}
     return result, findings
+
+
+def source_candidates(repo: str, header, info: dict) -> list[str]:
+    """Repos that may hold the tokenizer a GGUF was converted from, most likely first:
+    general.source.repo_url; the same organization's repo without the -GGUF suffix (a first-party upload such
+    as Qwen/Qwen3-Embedding-0.6B-GGUF); the GGUF repo card's base_model (the source, for quantizer repos);
+    and last general.base_model.0, which the converter copies from the source's own card and so names the
+    model the source was trained from (ibm-granite/granite-4.2-8b-GGUF names granite-4.1-8b-base there)."""
+    org, _, name = repo.partition("/")
+    stripped = re.sub(r"[-_.](gguf|GGUF)$", "", name)
+    cands = [hf_repo_from_url(header.get("general.source.repo_url")),
+             f"{org}/{stripped}" if stripped != name else None]
+    cands += card_base_models(info)
+    cands.append(hf_repo_from_url(header.get("general.base_model.0.repo_url")))
+    return [c for i, c in enumerate(cands) if c and c not in cands[:i] and c != repo]
 
 
 def check_repo(repo: str, downloads: int, out: Path, cache: Path, memo: dict, n_gen: int = 300, seed: int = 0,
@@ -312,9 +436,7 @@ def check_repo(repo: str, downloads: int, out: Path, cache: Path, memo: dict, n_
         return {**rec, "status": "no-tokenizer"}
 
     # the model this GGUF was converted from, then its base model (for drift)
-    cands = [hf_repo_from_url(header.get("general.source.repo_url")), hf_repo_from_url(header.get("general.base_model.0.repo_url"))]
-    cands += card_base_models(info)
-    cands = [c for i, c in enumerate(cands) if c and c not in cands[:i] and c != repo]
+    cands = source_candidates(repo, header, info)
     source, src_tj = None, None
     for c in cands:
         src_tj = fetch_tokenizer(c, cache)
@@ -354,7 +476,7 @@ def check_repo(repo: str, downloads: int, out: Path, cache: Path, memo: dict, n_
         base_stats = None
         if rec.get("drift") and base_tj:  # llama.cpp may match the base model rather than the drifted source
             try:
-                base_stats, _ = run_engine_check(vg, base_tj, n_gen, seed, 0)
+                base_stats, _ = run_engine_check(vg, base_tj, n_gen, seed, 0, extra=False)
             except Exception as exc:
                 base_stats = {"error": str(exc)[:200]}
     examples = [{"kind": f.kind, "class": getattr(f, "cls", None), "minimal": f.minimal,
@@ -467,6 +589,55 @@ def _signature(r: dict):
     return (r.get("pre"), e.get("encode"), e.get("decode"), tuple(sorted((e.get("classes") or {}).items())))
 
 
+def _cell(s: str) -> str:
+    """Text for a Markdown table cell: pipes escaped (token names like <|im_end|> keep their pipes), one line."""
+    return s.replace("|", "\\|").replace("\n", " ")
+
+
+def _extra_sections(ok: list[dict]) -> list[str]:
+    """Report sections for the refdecode, stress and start/stop-token checks (records from older scans
+    have none of these and are skipped)."""
+    lines: list[str] = []
+    special = [(r, [i for i in ((r["engine"].get("special") or {}).get("issues") or []) if i["severity"] == "high"])
+               for r in ok if (r["engine"].get("special") or {}).get("issues") is not None]
+    flagged = [(r, iss) for r, iss in special if iss]
+    if special:
+        lines += ["", "## Start and stop tokens", "",
+                  f"Checked in {len(special)} repos. **{len(flagged)}** differ from their source model in the tokens "
+                  "added around a prompt or the tokens that end generation "
+                  f"({sum(r['downloads'] for r, _ in flagged):,} downloads).", ""]
+        if flagged:
+            lines += ["| repo | downloads | check | difference |", "|---|---:|---|---|"]
+            for r, iss in sorted(flagged, key=lambda x: -x[0]["downloads"]):
+                for i in iss[:4]:
+                    lines.append(f"| {r['repo']} | {r['downloads']:,} | {i['check']} | {_cell(i['detail'][:220])} |")
+    rd = [r for r in ok if isinstance(r["engine"].get("refdecode"), dict) and "compared" in r["engine"]["refdecode"]]
+    rd_bad = [r for r in rd if r["engine"]["refdecode"]["mismatch"] + r["engine"]["refdecode"]["error"]]
+    if rd:
+        lines += ["", "## Decoding the source tokenizer's token ids", "",
+                  f"Checked in {len(rd)} repos. llama.cpp decodes the source tokenizer's ids differently in "
+                  f"**{len(rd_bad)}** ({sum(r['downloads'] for r in rd_bad):,} downloads).", ""]
+        if rd_bad:
+            lines += ["| repo | downloads | ids decoded differently | errors | example |", "|---|---:|---:|---:|---|"]
+            for r in sorted(rd_bad, key=lambda r: -r["downloads"]):
+                x = r["engine"]["refdecode"]
+                ex = (x.get("examples") or [{}])[0]
+                exs = f"`{ex.get('ref', '')!r}` → `{ex.get('got', '')!r}`" if ex else ("crash" if x.get("crash") else "")
+                lines.append(f"| {r['repo']} | {r['downloads']:,} | {x['mismatch']} | {x['error']} | {_cell(exs[:160])} |")
+    st = [r for r in ok if isinstance(r["engine"].get("stress"), dict) and "cases" in r["engine"]["stress"]]
+    st_bad = [r for r in st if r["engine"]["stress"]["mismatch"] + r["engine"]["stress"]["error"]]
+    if st:
+        lines += ["", "## Long inputs", "",
+                  f"Checked in {len(st)} repos. llama.cpp fails or disagrees on long inputs in **{len(st_bad)}**.", ""]
+        if st_bad:
+            lines += ["| repo | downloads | failures |", "|---|---:|---|"]
+            for r in sorted(st_bad, key=lambda r: -r["downloads"]):
+                f = r["engine"]["stress"]["failures"]
+                lines.append(f"| {r['repo']} | {r['downloads']:,} | "
+                             f"{', '.join(x['case'] + ' ' + x['kind'] for x in f[:5])} |")
+    return lines
+
+
 def report(out: Path) -> str:
     recs = _latest(out / "records.jsonl")
     failed = [r for r in recs if _load_failed(r)]
@@ -527,11 +698,12 @@ def report(out: Path) -> str:
     lines += ["", "## By architecture and pre-tokenizer", "", "| arch | pre | repos | downloads |", "|---|---|---:|---:|"]
     for (a, p), g in sorted(groups.items(), key=lambda kv: -kv[1]["downloads"]):
         lines.append(f"| {a} | {p} | {g['repos']} | {g['downloads']:,} |")
+    lines += _extra_sections(ok)
     if failed:
         lines += ["", "## llama.cpp could not load the vocabulary", "",
                   "| repo | downloads | arch | pre | error |", "|---|---:|---|---|---|"]
         for r in sorted(failed, key=lambda r: -r["downloads"]):
-            err = (r.get("error") or (r.get("engine") or {}).get("error_sample") or "").replace("|", "/").replace("\n", " ")
+            err = _cell(r.get("error") or (r.get("engine") or {}).get("error_sample") or "")
             lines.append(f"| {r['repo']} | {r['downloads']:,} | {r.get('arch')} | {r.get('pre')} | {err[:160]} |")
     lines += ["", "## Tokenizer drift: source repo vs its base model", "",
               "| GGUF repo | downloads | source | base | differs in | probes changed |", "|---|---:|---|---|---|---:|"]

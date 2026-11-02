@@ -10,3 +10,5 @@ harness/ollama_tok/go.local.sum
 results/run*/
 parts/
 results/*/hf-cache/
+results/*/builds/
+SUBMISSION.md
