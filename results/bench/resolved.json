@@ -1,0 +1,192 @@
+{
+ "gemma4-loaded-as-spm/broken": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-loaded-as-spm/fixed": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-byte-token-decode/broken": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-byte-token-decode/fixed": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-stop-tokens/broken": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-stop-tokens/fixed": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-byte-fallback-encode/broken": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-byte-fallback-encode/fixed": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-softcapping/broken": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-softcapping/fixed": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "tekken-combining-marks/broken": {
+  "repo": "bartowski/Mistral-Nemo-Instruct-2407-GGUF",
+  "revision": "a2dd64a0a76ea1bdb2bb6ab6fa5496b003c7c908",
+  "file": "Mistral-Nemo-Instruct-2407-Q4_K_M.gguf",
+  "notes": []
+ },
+ "tekken-combining-marks/fixed": {
+  "repo": "bartowski/Mistral-Nemo-Instruct-2407-GGUF",
+  "revision": "a2dd64a0a76ea1bdb2bb6ab6fa5496b003c7c908",
+  "file": "Mistral-Nemo-Instruct-2407-Q4_K_M.gguf",
+  "notes": []
+ },
+ "pixtral-pretokenizer/broken": {
+  "repo": "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF",
+  "revision": "ba223d14e45525f7fae81db77ea8cabeb2fc6c25",
+  "file": "NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf",
+  "notes": []
+ },
+ "pixtral-pretokenizer/fixed": {
+  "repo": "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF",
+  "revision": "ba223d14e45525f7fae81db77ea8cabeb2fc6c25",
+  "file": "NVIDIA-Nemotron3-Nano-4B-Q4_K_M.gguf",
+  "notes": []
+ },
+ "clean-spaces-decode/broken": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "clean-spaces-decode/fixed": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "tilde-symbol-class/broken": {
+  "repo": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+  "revision": "8a6ec9cf118e785a362ea94ee123c61c70553be6",
+  "file": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
+  "notes": [
+   "ISTA-DASLab/DeepSeek-V4.1-Flash-1017-GSQ-RCO-GGUF: skipped (no architecture or tokenizer in the GGUF metadata)",
+   "antirez/deepseek-v4.1-flash-gguf: skipped (llama.cpp 169e4a7ff201 does not know the architecture 'deepseek41')",
+   "antirez/deepseek-v4-gguf: skipped (no architecture or tokenizer in the GGUF metadata)"
+  ]
+ },
+ "tilde-symbol-class/fixed": {
+  "repo": "unsloth/DeepSeek-V4.1-Flash-1017-GGUF",
+  "revision": "8a6ec9cf118e785a362ea94ee123c61c70553be6",
+  "file": "dspark-DeepSeek-V4.1-Flash-1017-Q8_0.gguf",
+  "notes": []
+ },
+ "llama3-missing-pretokenizer/broken": {
+  "repo": "QuantFactory/Meta-Llama-3-8B-GGUF",
+  "revision": "1ca85c857dce892b673b988ad0aa83f2cb1bbd19",
+  "file": "Meta-Llama-3-8B.Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-add-bos/broken": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "e18a8a48038a5da3e89c1152441ab57546a70873",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-add-bos/fixed": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "glm4-0414-conversion/broken": {
+  "repo": "bartowski/THUDM_GLM-4-9B-0414-GGUF",
+  "revision": "04ba18da36301762c71a5feb68d54801f05c2441",
+  "file": "THUDM_GLM-4-9B-0414-Q4_K_M.gguf",
+  "notes": []
+ },
+ "glm4-0414-conversion/fixed": {
+  "repo": "bartowski/THUDM_GLM-4-9B-0414-GGUF",
+  "revision": "211924cd949e153b1017ed635e5b127d0b594e6f",
+  "file": "THUDM_GLM-4-9B-0414-Q4_K_M.gguf",
+  "notes": []
+ },
+ "qwen3-embedding-eos/broken": {
+  "repo": "Qwen/Qwen3-Embedding-0.6B-GGUF",
+  "revision": "48f36f50b4a081a6f56dd4a227f9b66668e1399f",
+  "file": "Qwen3-Embedding-0.6B-Q8_0.gguf",
+  "notes": []
+ },
+ "qwen3-embedding-eos/fixed": {
+  "repo": "Qwen/Qwen3-Embedding-0.6B-GGUF",
+  "revision": "370f27d7550e0def9b39c1f16d3fbaa13aa67728",
+  "file": "Qwen3-Embedding-0.6B-Q8_0.gguf",
+  "notes": []
+ },
+ "gemma4-chat-template/broken": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "f7c65a52de0efed3b8ab461e02e4448b3f760a01",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "gemma4-chat-template/fixed": {
+  "repo": "unsloth/gemma-4-E2B-it-GGUF",
+  "revision": "0314792d7f1f7e229411f620751375812bb9faf2",
+  "file": "gemma-4-E2B-it-Q4_K_M.gguf",
+  "notes": []
+ },
+ "control-gpt-oss-20b/only": {
+  "repo": "unsloth/gpt-oss-20b-GGUF",
+  "revision": "d449b42d93e1c2c7bda5312f5c25c8fb91dfa9b4",
+  "file": "gpt-oss-20b-Q4_K_M.gguf",
+  "notes": []
+ },
+ "control-llama-3.1-8b/only": {
+  "repo": "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF",
+  "revision": "bf5b95e96dac0462e2a09145ec66cae9a3f12067",
+  "file": "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
+  "notes": []
+ },
+ "control-qwen3-8b/only": {
+  "repo": "Qwen/Qwen3-8B-GGUF",
+  "revision": "7c41481f57cb95916b40956ab2f0b139b296d974",
+  "file": "Qwen3-8B-Q4_K_M.gguf",
+  "notes": []
+ },
+ "control-granite-4.2/only": {
+  "repo": "ibm-granite/granite-4.2-8b-GGUF",
+  "revision": "93f3f6a8938ee922b784cf4e5b4203cd3428df8f",
+  "file": "granite-4.2-8b-Q4_K_M.gguf",
+  "notes": []
+ }
+}
