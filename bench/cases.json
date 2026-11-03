@@ -1,0 +1,582 @@
+{
+ "version": 1,
+ "about": "Real bugs in llama.cpp and in published GGUF files, for `infercheck bench`. Engine cases pin the llama.cpp commit before the fix (broken) and the fix (fixed); file cases pin GGUF revisions on the Hub by date; controls are GGUFs with no known bug. model.gguf and model.reference are tried in order; {\"search\": ...} queries the Hub. See infercheck/bench.py.",
+ "cases": [
+  {
+   "id": "gemma4-loaded-as-spm",
+   "title": "Gemma 4's BPE vocabulary was tokenized with the SentencePiece algorithm",
+   "date": "2026-04-03",
+   "kind": "engine",
+   "category": "tokenizer",
+   "detector": "encode",
+   "engine": {
+    "broken": "0c58ba3365d2bc717b447b5d70e4d6be09ff3c40",
+    "fixed": "b069b10ab48f25ba119e59d0b8bf35d4f06e093f"
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF",
+     "ggml-org/gemma-4-E2B-it-GGUF",
+     {
+      "search": "gemma-4-E2B-it GGUF"
+     }
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "notes": "The first Gemma 4 support loaded its vocabulary as SPM; #21343 switched it to BPE with newline-only pre-splitting and raw UTF-8 bytes. The switch fixed words like \" discards\" but started dropping characters that need byte-fallback tokens (fixed in #21534) and crashing on some newline runs (#21406), so the fixed side has bugs of its own: only the comparison against the reference tokenizer can say which side is closer.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/21343"
+   ]
+  },
+  {
+   "id": "gemma4-newline-split",
+   "title": "Gemma 4 crashed on long inputs: its newline pre-split regex fell back to std::regex",
+   "date": "2026-04-04",
+   "kind": "engine",
+   "category": "crash",
+   "detector": "stress",
+   "platform": "linux",
+   "engine": {
+    "broken": "d006858316d4650bb4da0c6923294ccd741caefd",
+    "fixed": "b7ad48ebda2287c778fd826606d7b3b3570f60ab"
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF",
+     "ggml-org/gemma-4-E2B-it-GGUF",
+     {
+      "search": "gemma-4-E2B-it GGUF"
+     }
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "trigger": [
+    {
+     "repeat": "A",
+     "times": 50000
+    },
+    "line one\n\nline two"
+   ],
+   "notes": "The pre-tokenizer pattern [^\\n]+|[\\n]+ had no custom implementation, so it went through std::regex, which segfaults (stack overflow) on about 50,000 repeated characters. #21406 added a custom splitter. Checked offline with scripts/bench_offline.py: llama.cpp d0068583 segfaults on 6 of the 10 long inputs and b7ad48eb on none. The stack overflow is in libstdc++'s std::regex (GCC, so Linux); Apple's libc++ does not overflow on the same input, so the case only runs on Linux and a macOS run reports it as other-platform.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/21406"
+   ]
+  },
+  {
+   "id": "gemma4-byte-token-decode",
+   "title": "Gemma 4's byte-fallback tokens decoded to nothing (emoji vanished from output)",
+   "date": "2026-04-06",
+   "kind": "engine",
+   "category": "detokenizer",
+   "detector": "refdecode",
+   "engine": {
+    "broken": "941146b3f1ebcd54f125f1f80598f29231155989",
+    "fixed": "4aa962e2b0d04e6be6944f899edbdbe26177e492"
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF",
+     "ggml-org/gemma-4-E2B-it-GGUF",
+     {
+      "search": "gemma-4-E2B-it GGUF"
+     }
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "trigger": [
+    "🦙",
+    "this is 🦙.cpp"
+   ],
+   "notes": "token_to_piece had no branch for byte tokens in BPE vocabularies, so <0xF0><0x9F><0xA6><0x99> (🦙) decoded to an empty string; token_to_byte would have aborted. llama.cpp's own encoder dropped those characters at the time (fixed three days later), so an encode-and-decode round trip never produced the tokens: only decoding the reference's ids shows the bug. Checked offline with scripts/bench_offline.py: llama.cpp 941146b3 decodes ' this is 🦙.cpp' as ' this is.cpp', 4aa962e2 gets it right, and InferCheck's corpus run through both builds finds no difference.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/21488"
+   ]
+  },
+  {
+   "id": "gemma4-stop-tokens",
+   "title": "Gemma 4 stopped on the text token </s>",
+   "date": "2026-04-08",
+   "kind": "engine",
+   "category": "stop-tokens",
+   "detector": "stop",
+   "engine": {
+    "broken": "4a05e0c566cfffb7f870ccddde08c41d6f8c8d2b",
+    "fixed": "d9a12c82f0c81eea3ba54be5fb5250161993c450"
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF",
+     "ggml-org/gemma-4-E2B-it-GGUF",
+     {
+      "search": "gemma-4-E2B-it GGUF"
+     }
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "notes": "llama.cpp's end-of-generation auto-detection matched </s>; #21492 removes it from the EOG list (and makes it a normal token again) when the vocabulary has <|tool_response>.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/21492"
+   ]
+  },
+  {
+   "id": "gemma4-byte-fallback-encode",
+   "title": "Gemma 4 silently dropped characters that need byte-fallback tokens",
+   "date": "2026-04-09",
+   "kind": "engine",
+   "category": "tokenizer",
+   "detector": "encode",
+   "engine": {
+    "broken": "243532e5568704ced8b08136e70247f9ceecdbf7",
+    "fixed": "0ec191e1d761a4daec873dfd73278ee356944fe5"
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF",
+     "ggml-org/gemma-4-E2B-it-GGUF",
+     {
+      "search": "gemma-4-E2B-it GGUF"
+     }
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "trigger": [
+    "🦙",
+    "this is 🦙.cpp"
+   ],
+   "notes": "For BPE without GPT-2 byte encoding, the fallback looked up a one-byte string instead of <0xXX>, found nothing and emitted nothing.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/21534"
+   ]
+  },
+  {
+   "id": "gemma4-softcapping",
+   "title": "Gemma 4's final_logit_softcapping was not read",
+   "date": "2026-04-04",
+   "kind": "engine",
+   "category": "metadata",
+   "detector": "none",
+   "engine": {
+    "broken": "b7ad48ebda2287c778fd826606d7b3b3570f60ab",
+    "fixed": "650bf14eb9a922de0f88c9523a271159cc5ae469"
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF",
+     "ggml-org/gemma-4-E2B-it-GGUF",
+     {
+      "search": "gemma-4-E2B-it GGUF"
+     }
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "notes": "Changes the logits, not the tokenizer: InferCheck has no check for it yet (a logits comparison would).",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/21390"
+   ]
+  },
+  {
+   "id": "tekken-combining-marks",
+   "title": "Tekken and GPT-4o pre-tokenizers split words at combining marks",
+   "date": "2026-10-20",
+   "kind": "engine",
+   "category": "tokenizer",
+   "detector": "encode",
+   "engine": {
+    "broken": "7879491cf4c1cfb25acbd78fae34a9e7a8e3a062",
+    "fixed": "d8d92973c8c21bb4dd5d592f0fec26fe2cd1e654"
+   },
+   "model": {
+    "gguf": [
+     "bartowski/Mistral-Nemo-Instruct-2407-GGUF",
+     {
+      "search": "Mistral-Nemo-Instruct-2407 GGUF"
+     }
+    ],
+    "reference": [
+     "mistralai/Mistral-Nemo-Instruct-2407",
+     "unsloth/Mistral-Nemo-Instruct-2407"
+    ]
+   },
+   "trigger": [
+    "भारत एक विशाल देश है",
+    "हिन्दी"
+   ],
+   "notes": "Found with InferCheck (tkran2). The regex lookaheads allowed letters but not marks (\\p{M}).",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/issues/30787",
+    "https://github.com/ggml-org/llama.cpp/pull/30845"
+   ],
+   "found_by_infercheck": true
+  },
+  {
+   "id": "pixtral-pretokenizer",
+   "title": "GGUFs tagged \"pixtral\" got the Llama 3 pre-tokenizer instead of Tekken",
+   "date": "2026-10-22",
+   "kind": "engine",
+   "category": "tokenizer",
+   "detector": "encode",
+   "engine": {
+    "broken": "bf039c84969bfca70ba2814c9e5e95752559b4bc",
+    "fixed": "e197cef4554d466e0becac20e453a355daba8e5d"
+   },
+   "model": {
+    "gguf": [
+     "nvidia/NVIDIA-Nemotron-3-Nano-4B-GGUF"
+    ]
+   },
+   "notes": "Found with InferCheck (tkran2): affected NVIDIA Nemotron 3/3.5 GGUFs.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/issues/30894",
+    "https://github.com/ggml-org/llama.cpp/pull/30960"
+   ],
+   "found_by_infercheck": true
+  },
+  {
+   "id": "clean-spaces-decode",
+   "title": "llama.cpp removed the space before punctuation when decoding Gemma 4 and others",
+   "date": "2026-10-22",
+   "kind": "engine",
+   "category": "detokenizer",
+   "detector": "decode",
+   "engine": {
+    "broken": "e197cef4554d466e0becac20e453a355daba8e5d",
+    "fixed": "d88040c704c8855c497d46c20675a3d492f70f94"
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF",
+     "ggml-org/gemma-4-E2B-it-GGUF",
+     {
+      "search": "gemma-4-E2B-it GGUF"
+     }
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "trigger": [
+    "x != y",
+    "Wait , what ?"
+   ],
+   "notes": "Found with InferCheck (tkran2): x != y decoded as x!= y. #30940 adds a clean_spaces GGUF key and turns the clean-up off by default for these pre-tokenizers.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/issues/30905",
+    "https://github.com/ggml-org/llama.cpp/pull/30940"
+   ],
+   "found_by_infercheck": true
+  },
+  {
+   "id": "tilde-symbol-class",
+   "title": "\" ~\" was split in two, preventing DeepSeek V4's Ġ~ merge",
+   "date": "2026-08-18",
+   "kind": "engine",
+   "category": "tokenizer",
+   "detector": "encode",
+   "engine": {
+    "broken": "169e4a7ff201e666c2325bcd35afb64573e39d09",
+    "fixed": "afd439df1f081ce0f6bc76965aa0a0ed762ecc91"
+   },
+   "model": {
+    "gguf": [
+     {
+      "search": "DeepSeek-V4 GGUF"
+     }
+    ],
+    "reference": [
+     {
+      "search": "deepseek-ai/DeepSeek-V4"
+     }
+    ]
+   },
+   "trigger": [
+    "cd ~/src",
+    "a ~ b"
+   ],
+   "notes": "The collapsed \\p{S} symbol class was missing '~'. The repos are found by search: check resolved.json.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/26972"
+   ]
+  },
+  {
+   "id": "qwen2-long-input-crash",
+   "title": "Qwen2-style tokenizers crashed llama.cpp on long runs of one character",
+   "date": "2026-04-07",
+   "kind": "engine",
+   "category": "crash",
+   "detector": "stress",
+   "platform": "linux",
+   "engine": {
+    "broken": "a8ec0df4617692ef0f18b212f2e16bba540e053a",
+    "fixed": "0d049d6a9245ccffc6073743ff8b6bb24ac6a47b"
+   },
+   "model": {
+    "gguf": [
+     "Qwen/Qwen3-8B-GGUF",
+     "unsloth/Qwen3-8B-GGUF"
+    ],
+    "reference": [
+     "Qwen/Qwen3-8B"
+    ]
+   },
+   "trigger": [
+    {
+     "repeat": "A",
+     "times": 50000
+    }
+   ],
+   "notes": "The Qwen2 regex fell through to std::regex, whose recursive backtracking overflowed the stack (43K 'A's). InferCheck's corpus had nothing that long, so this case motivated the stress check. The stack overflow is in libstdc++'s std::regex (GCC, so Linux); Apple's libc++ does not overflow on the same input, so the case only runs on Linux and a macOS run reports it as other-platform.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/issues/21113",
+    "https://github.com/ggml-org/llama.cpp/pull/21257"
+   ]
+  },
+  {
+   "id": "llama3-missing-pretokenizer",
+   "title": "Llama 3 GGUFs converted before the BPE pre-tokenizer fix",
+   "date": "2024-04-29",
+   "kind": "file",
+   "category": "tokenizer",
+   "detector": "encode",
+   "file": {
+    "broken_repo": "QuantFactory/Meta-Llama-3-8B-GGUF",
+    "bug_header": {
+     "key": "tokenizer.ggml.pre",
+     "missing": true
+    }
+   },
+   "causes": [
+    "digits",
+    "apostrophe",
+    "whitespace",
+    "whitespace+text"
+   ],
+   "model": {
+    "gguf": [
+     "QuantFactory/Meta-Llama-3-8B-GGUF"
+    ],
+    "reference": [
+     "NousResearch/Meta-Llama-3-8B",
+     "meta-llama/Meta-Llama-3-8B"
+    ]
+   },
+   "trigger": [
+    " !",
+    "\tb"
+   ],
+   "notes": "Files without tokenizer.ggml.pre still load, with a warning, using the default (GPT-2) pre-tokenizer. The repo's maintainer said V1 was made before the fix. No fixed upload of the same repo, so this case counts only findings with the causes listed.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/6920",
+    "https://huggingface.co/QuantFactory/Meta-Llama-3-8B-GGUF-v2/discussions/1"
+   ]
+  },
+  {
+   "id": "gemma4-add-bos",
+   "title": "Gemma 4 GGUFs from launch week had add_bos_token = false",
+   "date": "2026-04-06",
+   "kind": "file",
+   "category": "wrap",
+   "detector": "none",
+   "engine": {
+    "at": "f51fd36d79a0bbb89c2ddb1f10b10edaa18f3ca0"
+   },
+   "file": {
+    "broken_before": "2026-04-07",
+    "bug_header": {
+     "key": "tokenizer.ggml.add_bos_token",
+     "equals": false
+    }
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF",
+     "ggml-org/gemma-4-E2B-it-GGUF"
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "notes": "The converter wrote add_bos_token = false, so llama.cpp gave plain-text prompts no BOS; #21500 made the converter write true and made llama.cpp override old files. This case was first scored as a wrap bug, but the run showed the original tokenizer behaves like the file before the fix: transformers adds no BOS to plain Gemma 4 text (Google's tokenizer_config.json does not set add_bos_token, and transformers 5.22.1 then adds none), and chat prompts get their BOS from the chat template in both. #21500 is llama.cpp choosing to give plain-text prompts a BOS too, which a comparison against the original tokenizer cannot call a bug, so the case is not covered.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/21500",
+    "https://unsloth.ai/docs/new/changelog"
+   ]
+  },
+  {
+   "id": "glm4-0414-conversion",
+   "title": "GLM-4-0414 GGUFs converted before the rotary-dimension fix",
+   "date": "2025-04-23",
+   "kind": "file",
+   "category": "metadata",
+   "detector": "none",
+   "file": {
+    "broken_before": "2025-04-24",
+    "bug_header": {
+     "key": "tokenizer.ggml.eot_token_id",
+     "missing": true
+    }
+   },
+   "model": {
+    "gguf": [
+     "bartowski/THUDM_GLM-4-9B-0414-GGUF",
+     "unsloth/GLM-4-9B-0414-GGUF",
+     "lmstudio-community/GLM-4-9B-0414-GGUF"
+    ],
+    "reference": [
+     "THUDM/GLM-4-9B-0414",
+     "zai-org/GLM-4-9B-0414"
+    ]
+   },
+   "notes": "#13021 fixed three things in the GLM-4-0414 converter: the rotary dimension (half the head dimension; the old files used all of it, which gives wrong logits), the end tokens and the BOS. This case was first scored as a stop-token bug, but the run showed the end-token change made no difference: the old files took <|user|> as EOS from tokenizer_config.json and llama.cpp stops on <|endoftext|> by name, so both files stop on the same two tokens, and [gMASK] comes from the chat template either way. What users saw was the rotary dimension, which changes the logits: not covered. Both files also lack <|observation|> as a stop token; today's converter marks it (eom), so only files converted before that change are affected.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/13021"
+   ]
+  },
+  {
+   "id": "qwen3-embedding-eos",
+   "title": "Qwen3-Embedding GGUFs appended the wrong end token",
+   "date": "2025-06-21",
+   "kind": "file",
+   "category": "wrap",
+   "detector": "wrap",
+   "file": {
+    "broken_before": "2025-06-22",
+    "bug_header": {
+     "key": "tokenizer.ggml.add_eos_token",
+     "not_equals": true
+    }
+   },
+   "model": {
+    "gguf": [
+     "Qwen/Qwen3-Embedding-0.6B-GGUF"
+    ],
+    "reference": [
+     "Qwen/Qwen3-Embedding-0.6B"
+    ]
+   },
+   "notes": "The tokenizer's post-processor appends <|endoftext|>; the converter kept the config's EOS instead. Needs an upload before and after 2025-06-22; otherwise inconclusive.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/14314"
+   ]
+  },
+  {
+   "id": "gemma4-chat-template",
+   "title": "Gemma 4 GGUFs updated with Google's chat template fixes (tool calling)",
+   "date": "2026-04-11",
+   "kind": "file",
+   "category": "template",
+   "detector": "none",
+   "file": {
+    "broken_before": "2026-04-11"
+   },
+   "model": {
+    "gguf": [
+     "unsloth/gemma-4-E2B-it-GGUF"
+    ],
+    "reference": [
+     "google/gemma-4-E2B-it",
+     "unsloth/gemma-4-E2B-it"
+    ]
+   },
+   "notes": "A chat template change: InferCheck does not render templates yet, so this is expected to show nothing.",
+   "sources": [
+    "https://unsloth.ai/docs/new/changelog"
+   ]
+  },
+  {
+   "id": "control-gpt-oss-20b",
+   "title": "Control: gpt-oss-20b",
+   "kind": "control",
+   "category": "control",
+   "model": {
+    "gguf": [
+     "unsloth/gpt-oss-20b-GGUF",
+     "ggml-org/gpt-oss-20b-GGUF"
+    ],
+    "reference": [
+     "openai/gpt-oss-20b"
+    ]
+   },
+   "sources": [
+    "https://huggingface.co/openai/gpt-oss-20b"
+   ]
+  },
+  {
+   "id": "control-llama-3.1-8b",
+   "title": "Control: Llama 3.1 8B Instruct",
+   "kind": "control",
+   "category": "control",
+   "model": {
+    "gguf": [
+     "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF"
+    ],
+    "reference": [
+     "unsloth/Meta-Llama-3.1-8B-Instruct",
+     "meta-llama/Llama-3.1-8B-Instruct"
+    ]
+   },
+   "sources": [
+    "https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct"
+   ]
+  },
+  {
+   "id": "control-qwen3-8b",
+   "title": "Control: Qwen3 8B",
+   "kind": "control",
+   "category": "control",
+   "model": {
+    "gguf": [
+     "Qwen/Qwen3-8B-GGUF",
+     "unsloth/Qwen3-8B-GGUF"
+    ],
+    "reference": [
+     "Qwen/Qwen3-8B"
+    ]
+   },
+   "notes": "Expected to be flagged: since llama.cpp #18825 (2026-02-20) the ordinary Qwen token \"</s>\" (128247) is an end-of-generation control token, so prompts containing </s> tokenize differently. Found while building this benchmark; not yet reported.",
+   "sources": [
+    "https://github.com/ggml-org/llama.cpp/pull/18825"
+   ]
+  },
+  {
+   "id": "control-granite-4.2",
+   "title": "Control: Granite 4.2 (an intentional tokenizer change)",
+   "kind": "control",
+   "category": "control",
+   "model": {
+    "gguf": [
+     "ibm-granite/granite-4.2-8b-GGUF",
+     {
+      "search": "granite-4.2-8b GGUF"
+     }
+    ],
+    "reference": [
+     "ibm-granite/granite-4.2-8b"
+    ]
+   },
+   "notes": "Granite 4.2 tokenizes numbers and blank lines differently from 4.1 on purpose (IBM confirmed). The GGUF should match its own source model, so nothing should be flagged here.",
+   "sources": [
+    "https://huggingface.co/ibm-granite/granite-4.2-8b/discussions"
+   ]
+  }
+ ]
+}
