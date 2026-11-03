@@ -21,3 +21,11 @@ results/hub-smoke/
 results/qwen-check/
 results/qwen3-fix/
 results/paddle-fix/
+list.json
+repos.txt
+results/*.log
+results/hub*/
+results/bench*/
+results/paddle-fix/
+results/qwen-check/
+results/qwen3-fix/
