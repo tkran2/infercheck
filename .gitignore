@@ -12,3 +12,12 @@ parts/
 results/*/hf-cache/
 results/*/builds/
 SUBMISSION.md
+results/*.log
+results/*/findings/
+results/bench-run*/
+results/hub-500/
+results/hub500/
+results/hub-smoke/
+results/qwen-check/
+results/qwen3-fix/
+results/paddle-fix/
